@@ -1,0 +1,27 @@
+# === General ===
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# === IDEs ===
+.vscode/
+.idea/
+
+# === Gradle ===
+.gradle/
+**/build/
+**/out/
+!gradle/wrapper/gradle-wrapper.jar
+
+# === Node / Vite ===
+node_modules/
+dist/
+
+# === OS / Editor ===
+*.swp
+*.swo
+
+# === Environment ===
+.env
+.env.*
