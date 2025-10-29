@@ -56,6 +56,6 @@ Beat Layer is a full-stack web application for creating, organizing, and discove
 - Deployment with Docker or managed hosting
 
 ### Author
-####Simao Mansur
+#### Simao Mansur
 GitHub: https://github.com/simaomansur
 LinkedIn: https://www.linkedin.com/in/simaomansur
