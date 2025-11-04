@@ -1,315 +1,80 @@
-import { useEffect, useState, FormEvent } from "react";
-import { fetchJams, createJam, deleteJam } from "./api";
-import type { Jam } from "./api";
+import React from "react";
+import { Routes, Route, Link } from "react-router-dom";
+import HomePage from "./pages/HomePage";
+import JamsPage from "./pages/JamsPage";
+import ProfilePage from "./pages/ProfilePage";
+import AboutPage from "./pages/AboutPage";
 
-function App() {
-  const [jams, setJams] = useState<Jam[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // form state
-  const [title, setTitle] = useState("");
-  const [key, setKey] = useState("");
-  const [bpm, setBpm] = useState<string>("");
-  const [genre, setGenre] = useState("");
-  const [instrumentHint, setInstrumentHint] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await fetchJams();
-        setJams(data);
-      } catch (err: any) {
-        setError(err.message ?? "Failed to load jams");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-
-    if (!title.trim()) {
-      setError("Title is required");
-      return;
-    }
-
-    setError(null);
-    setSubmitting(true);
-
-    try {
-      const newJam = await createJam({
-        title: title.trim(),
-        key: key.trim() || null,
-        bpm: bpm ? Number(bpm) : null,
-        genre: genre.trim() || null,
-        instrumentHint: instrumentHint.trim() || null,
-      });
-
-      // prepend new jam
-      setJams((prev) => [newJam, ...prev]);
-
-      // reset form
-      setTitle("");
-      setKey("");
-      setBpm("");
-      setGenre("");
-      setInstrumentHint("");
-    } catch (err: any) {
-      setError(err.message ?? "Failed to create jam");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-    const handleDelete = async (id: string) => {
-    try {
-      await deleteJam(id);
-      setJams((prev) => prev.filter((jam) => jam.id !== id));
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message ?? "Failed to delete jam");
-    }
-  };
-
-
-  if (loading) {
-    return (
-      <div style={styles.page}>
-        <h1 style={styles.title}>Beat Layer</h1>
-        <p>Loading jams...</p>
-      </div>
-    );
-  }
-
+const App = () => {
   return (
-    <div style={styles.page}>
-      <h1 style={styles.title}>Beat Layer – Jams</h1>
+    <div style={styles.app}>
+      <header style={styles.header}>
+        <div style={styles.logo}>Beat Layer</div>
+        <nav style={styles.nav}>
+          <Link style={styles.navLink} to="/">
+            Home
+          </Link>
+          <Link style={styles.navLink} to="/jams">
+            Jams
+          </Link>
+          <Link style={styles.navLink} to="/profile/me">
+            My Profile
+          </Link>
+          <Link style={styles.navLink} to="/about">
+            About
+          </Link>
+        </nav>
+      </header>
 
-      <div style={styles.layout}>
-        {/* Left column: Create Jam form */}
-        <div style={styles.formCard}>
-          <h2 style={styles.sectionTitle}>New Jam</h2>
-          <form onSubmit={handleSubmit} style={styles.form}>
-            <label style={styles.label}>
-              Title *
-              <input
-                style={styles.input}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Lo-fi Groove"
-              />
-            </label>
-
-            <label style={styles.label}>
-              Key
-              <input
-                style={styles.input}
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="Am"
-              />
-            </label>
-
-            <label style={styles.label}>
-              BPM
-              <input
-                style={styles.input}
-                type="number"
-                value={bpm}
-                onChange={(e) => setBpm(e.target.value)}
-                placeholder="90"
-              />
-            </label>
-
-            <label style={styles.label}>
-              Genre
-              <input
-                style={styles.input}
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                placeholder="lofi"
-              />
-            </label>
-
-            <label style={styles.label}>
-              Instrument hint
-              <input
-                style={styles.input}
-                value={instrumentHint}
-                onChange={(e) => setInstrumentHint(e.target.value)}
-                placeholder="guitar"
-              />
-            </label>
-
-            {error && <p style={styles.error}>{error}</p>}
-
-            <button style={styles.button} type="submit" disabled={submitting}>
-              {submitting ? "Saving..." : "Save Jam"}
-            </button>
-          </form>
-        </div>
-
-        {/* Right column: Jam list */}
-        <div style={styles.listCard}>
-          <h2 style={styles.sectionTitle}>Your Jams</h2>
-          {jams.length === 0 ? (
-            <p>No jams yet. Add one on the left.</p>
-          ) : (
-            <ul style={styles.list}>
-              {jams.map((jam) => (
-                <li key={jam.id} style={styles.card}>
-                  <div style={styles.cardHeader}>
-                    <div>
-                      <span style={styles.cardTitle}>{jam.title}</span>
-                      {jam.bpm != null && (
-                        <span style={styles.badge}>{jam.bpm} bpm</span>
-                      )}
-                    </div>
-                    <button
-                      style={styles.deleteButton}
-                      type="button"
-                      onClick={() => handleDelete(jam.id)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div style={styles.cardMeta}>
-                    {jam.key && <span>{jam.key}</span>}
-                    {jam.genre && <span> · {jam.genre}</span>}
-                  </div>
-                  {jam.instrumentHint && (
-                    <p style={styles.hint}>🎸 {jam.instrumentHint}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
+      <main style={styles.main}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/jams" element={<JamsPage />} />
+          <Route path="/profile/:username" element={<ProfilePage />} />
+          <Route path="/about" element={<AboutPage />} />
+        </Routes>
+      </main>
     </div>
   );
-}
+};
 
-const styles: { [key: string]: React.CSSProperties } = {
-  page: {
+const styles: any = {
+  app: {
     minHeight: "100vh",
-    padding: "2rem",
-    fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
     background:
       "linear-gradient(135deg, #050816 0%, #111827 50%, #020617 100%)",
     color: "#e5e7eb",
+    fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
   },
-  title: {
-    fontSize: "2rem",
-    marginBottom: "1.5rem",
-  },
-  layout: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1.2fr) minmax(0, 2fr)",
-    gap: "1.5rem",
-    alignItems: "flex-start",
-  },
-  sectionTitle: {
-    fontSize: "1.1rem",
-    marginBottom: "0.75rem",
-  },
-  formCard: {
-    background: "rgba(15, 23, 42, 0.95)",
-    borderRadius: "0.75rem",
-    padding: "1.25rem",
-    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.5)",
-    border: "1px solid rgba(148, 163, 184, 0.35)",
-  },
-  listCard: {
-    background: "rgba(15, 23, 42, 0.85)",
-    borderRadius: "0.75rem",
-    padding: "1.25rem",
-    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.45)",
-    border: "1px solid rgba(148, 163, 184, 0.3)",
-  },
-  form: {
+  header: {
     display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  label: {
-    fontSize: "0.85rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.35rem",
-  },
-  input: {
-    padding: "0.45rem 0.6rem",
-    borderRadius: "0.5rem",
-    border: "1px solid rgba(148, 163, 184, 0.5)",
-    background: "rgba(15, 23, 42, 0.9)",
-    color: "#e5e7eb",
-    outline: "none",
-  },
-  button: {
-    marginTop: "0.5rem",
-    padding: "0.6rem 0.9rem",
-    borderRadius: "999px",
-    border: "none",
-    fontWeight: 600,
-    fontSize: "0.9rem",
-    cursor: "pointer",
-    background:
-      "radial-gradient(circle at 0% 0%, #22c55e 0%, #22d3ee 30%, #6366f1 70%, #ec4899 100%)",
-  },
-  list: {
-    listStyle: "none",
-    padding: 0,
-    margin: 0,
-    display: "grid",
-    gap: "0.75rem",
-  },
-  card: {
-    background: "rgba(15, 23, 42, 0.95)",
-    borderRadius: "0.75rem",
-    padding: "0.9rem 1rem",
-    border: "1px solid rgba(148, 163, 184, 0.25)",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "0.25rem",
+    justifyContent: "space-between",
+    padding: "0.75rem 1.5rem",
+    borderBottom: "1px solid rgba(148, 163, 184, 0.3)",
+    background: "rgba(15, 23, 42, 0.95)",
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
   },
-  cardTitle: {
-    fontWeight: 600,
-    fontSize: "1rem",
-  },
-  badge: {
-    padding: "0.15rem 0.5rem",
-    borderRadius: "999px",
-    fontSize: "0.75rem",
-    border: "1px solid rgba(248, 250, 252, 0.3)",
-  },
-  cardMeta: {
-    fontSize: "0.85rem",
-    color: "#9ca3af",
-    marginBottom: "0.25rem",
-  },
-  hint: {
-    fontSize: "0.8rem",
-    color: "#d1d5db",
-    marginTop: "0.1rem",
-  },
-  error: {
-    fontSize: "0.8rem",
-    color: "#fecaca",
-  },
-    deleteButton: {
-    border: "none",
-    background: "transparent",
-    color: "#fca5a5",
-    cursor: "pointer",
+  logo: {
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
     fontSize: "0.9rem",
+  },
+  nav: {
+    display: "flex",
+    gap: "1rem",
+    fontSize: "0.9rem",
+  },
+  navLink: {
+    textDecoration: "none",
+    color: "#e5e7eb",
+    opacity: 0.85,
+  },
+  main: {
+    padding: "1.5rem",
   },
 };
 
