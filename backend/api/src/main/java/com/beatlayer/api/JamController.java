@@ -6,6 +6,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/jams")
+@CrossOrigin(origins = "http://localhost:5173")
 public class JamController {
 
   private final JamRepository repo;
