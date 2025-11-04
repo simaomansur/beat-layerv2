@@ -1,5 +1,5 @@
 import { useEffect, useState, FormEvent } from "react";
-import { fetchJams, createJam } from "./api";
+import { fetchJams, createJam, deleteJam } from "./api";
 import type { Jam } from "./api";
 
 function App() {
@@ -64,6 +64,17 @@ function App() {
       setSubmitting(false);
     }
   };
+
+    const handleDelete = async (id: string) => {
+    try {
+      await deleteJam(id);
+      setJams((prev) => prev.filter((jam) => jam.id !== id));
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message ?? "Failed to delete jam");
+    }
+  };
+
 
   if (loading) {
     return (
@@ -152,10 +163,19 @@ function App() {
               {jams.map((jam) => (
                 <li key={jam.id} style={styles.card}>
                   <div style={styles.cardHeader}>
-                    <span style={styles.cardTitle}>{jam.title}</span>
-                    {jam.bpm != null && (
-                      <span style={styles.badge}>{jam.bpm} bpm</span>
-                    )}
+                    <div>
+                      <span style={styles.cardTitle}>{jam.title}</span>
+                      {jam.bpm != null && (
+                        <span style={styles.badge}>{jam.bpm} bpm</span>
+                      )}
+                    </div>
+                    <button
+                      style={styles.deleteButton}
+                      type="button"
+                      onClick={() => handleDelete(jam.id)}
+                    >
+                      ✕
+                    </button>
                   </div>
                   <div style={styles.cardMeta}>
                     {jam.key && <span>{jam.key}</span>}
@@ -283,6 +303,13 @@ const styles: { [key: string]: React.CSSProperties } = {
   error: {
     fontSize: "0.8rem",
     color: "#fecaca",
+  },
+    deleteButton: {
+    border: "none",
+    background: "transparent",
+    color: "#fca5a5",
+    cursor: "pointer",
+    fontSize: "0.9rem",
   },
 };
 

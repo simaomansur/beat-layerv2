@@ -44,3 +44,15 @@ export async function createJam(payload: CreateJamRequest): Promise<Jam> {
 
   return res.json();
 }
+
+export async function deleteJam(id: string) {
+  const res = await fetch(`${BASE_URL}/jams/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok && res.status !== 404) {
+    // 404 is "already gone" which we can ignore
+    throw new Error(`Failed to delete jam: ${res.status}`);
+  }
+}
+

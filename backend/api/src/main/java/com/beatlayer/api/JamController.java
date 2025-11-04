@@ -1,5 +1,6 @@
 package com.beatlayer.api;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.*;
@@ -41,5 +42,13 @@ public class JamController {
         new org.springframework.web.server.ResponseStatusException(
             org.springframework.http.HttpStatus.NOT_FOUND, "Jam not found"));
     return JamDtos.fromEntity(jam);
+  }
+  @DeleteMapping("/{id}")
+  public ResponseEntity<Void> delete(@PathVariable UUID id) {
+    if (!repo.existsById(id)) {
+      return ResponseEntity.notFound().build();
+    }
+      repo.deleteById(id);
+      return ResponseEntity.noContent().build();
   }
 }
