@@ -1,332 +1,260 @@
+// src/pages/JamsPage.tsx
 import React, { useEffect, useState, FormEvent } from "react";
-import { fetchJams, createJam, deleteJam, fetchCurrentUser } from "../api";
+import { fetchJams, createJam, deleteJam } from "../api";
+import "../components/JamsPage.css";
 
-const JamsPage = () => {
-  const [jams, setJams] = useState<any[]>([]);
+type Jam = {
+  id: string;
+  title: string;
+  key: string;
+  bpm: number;
+  genre: string;
+  instrumentHint: string;
+  createdAt: string; // adjust if your backend uses a different field name
+};
+
+const MIN_BPM = 40;
+const MAX_BPM = 260;
+
+const JamsPage: React.FC = () => {
+  const [jams, setJams] = useState<Jam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [me, setMe] = useState<any | null>(null);
 
   // form state
   const [title, setTitle] = useState("");
-  const [key, setKey] = useState("");
+  const [keyVal, setKeyVal] = useState("");
   const [bpm, setBpm] = useState<string>("");
   const [genre, setGenre] = useState("");
   const [instrumentHint, setInstrumentHint] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
+  // Load jams on mount
   useEffect(() => {
     const load = async () => {
       try {
-        // load current user and jams in parallel
-        const [user, data] = await Promise.all([
-          fetchCurrentUser(),
-          fetchJams(),
-        ]);
-
-        setMe(user);
-        setJams(data);
-      } catch (err: any) {
+        const data = await fetchJams();
+        // Optional: sort newest first if backend doesn’t already
+        const sorted = [...data].sort(
+          (a: Jam, b: Jam) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setJams(sorted);
+      } catch (err) {
         console.error(err);
-        setError(err.message ?? "Failed to load jams");
+        setError("Failed to load jams. Please try again.");
       } finally {
         setLoading(false);
       }
     };
+
     load();
   }, []);
 
+  const resetForm = () => {
+    setTitle("");
+    setKeyVal("");
+    setBpm("");
+    setGenre("");
+    setInstrumentHint("");
+    setFormError(null);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setFormError(null);
 
-    if (!title.trim()) {
-      setError("Title is required");
+    const bpmNumber = Number(bpm);
+    if (
+      Number.isNaN(bpmNumber) ||
+      bpmNumber < MIN_BPM ||
+      bpmNumber > MAX_BPM
+    ) {
+      setFormError(`BPM must be between ${MIN_BPM} and ${MAX_BPM}.`);
       return;
     }
 
-    setError(null);
+    if (!title.trim()) {
+      setFormError("Title is required.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const newJam = await createJam({
         title: title.trim(),
-        key: key.trim() || null,
-        bpm: bpm ? Number(bpm) : null,
-        genre: genre.trim() || null,
-        instrumentHint: instrumentHint.trim() || null,
+        key: keyVal.trim(),
+        bpm: bpmNumber,
+        genre: genre.trim(),
+        instrumentHint: instrumentHint.trim(),
       });
 
+      // Prepend the new jam to the list
       setJams((prev) => [newJam, ...prev]);
-
-      setTitle("");
-      setKey("");
-      setBpm("");
-      setGenre("");
-      setInstrumentHint("");
-    } catch (err: any) {
+      resetForm();
+    } catch (err) {
       console.error(err);
-      setError(err.message ?? "Failed to create jam");
+      setFormError("Failed to create jam. Check your inputs and try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (!window.confirm("Delete this jam?")) return;
+
     try {
       await deleteJam(id);
-      setJams((prev) => prev.filter((jam) => jam.id !== id));
-    } catch (err: any) {
+      setJams((prev) => prev.filter((j) => j.id !== id));
+    } catch (err) {
       console.error(err);
-      setError(err.message ?? "Failed to delete jam");
+      alert("Failed to delete jam. Please try again.");
     }
   };
 
-  if (loading) {
-    return (
-      <div style={styles.page}>
-        <h1 style={styles.title}>Jams</h1>
-        <p>Loading jams...</p>
-      </div>
-    );
-  }
-
   return (
-    <div style={styles.page}>
-      <h1 style={styles.title}>Jams</h1>
+    <div className="jams-page">
+      <div className="jams-page__inner">
+        <header className="jams-header">
+          <h1>Beat Layer – Jams</h1>
+          <p>Create and explore groove ideas to build on later.</p>
+        </header>
 
-      {me && (
-        <p style={styles.subtitle}>
-          Signed in as <strong>{me.handle}</strong>
-        </p>
-      )}
+        <section className="jams-layout">
+          {/* LEFT: form */}
+          <div className="jams-form-card">
+            <h2>Create a new jam</h2>
+            <form onSubmit={handleSubmit} className="jams-form">
+              {formError && (
+                <div className="jams-form__error">{formError}</div>
+              )}
 
-      <div style={styles.layout}>
-        {/* Left: form */}
-        <div style={styles.formCard}>
-          <h2 style={styles.sectionTitle}>New Jam</h2>
-          <form onSubmit={handleSubmit} style={styles.form}>
-            <label style={styles.label}>
-              Title *
-              <input
-                style={styles.input}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Lo-fi Groove"
-              />
-            </label>
+              <div className="jams-form__row">
+                <label>
+                  Title<span className="required">*</span>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Lo-fi midnight groove"
+                    required
+                  />
+                </label>
+              </div>
 
-            <label style={styles.label}>
-              Key
-              <input
-                style={styles.input}
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="Am"
-              />
-            </label>
+              <div className="jams-form__row jams-form__row--split">
+                <label>
+                  Key
+                  <input
+                    type="text"
+                    value={keyVal}
+                    onChange={(e) => setKeyVal(e.target.value)}
+                    placeholder="e.g. C#m"
+                  />
+                </label>
 
-            <label style={styles.label}>
-              BPM
-              <input
-                style={styles.input}
-                type="number"
-                value={bpm}
-                onChange={(e) => setBpm(e.target.value)}
-                placeholder="90"
-              />
-            </label>
+                <label>
+                  BPM
+                  <input
+                    type="number"
+                    value={bpm}
+                    onChange={(e) => setBpm(e.target.value)}
+                    placeholder="120"
+                    min={MIN_BPM}
+                    max={MAX_BPM}
+                  />
+                  <small className="field-hint">
+                    {MIN_BPM}–{MAX_BPM} bpm
+                  </small>
+                </label>
+              </div>
 
-            <label style={styles.label}>
-              Genre
-              <input
-                style={styles.input}
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                placeholder="lofi"
-              />
-            </label>
+              <div className="jams-form__row">
+                <label>
+                  Genre
+                  <input
+                    type="text"
+                    value={genre}
+                    onChange={(e) => setGenre(e.target.value)}
+                    placeholder="Lo-fi / hip-hop / trap"
+                  />
+                </label>
+              </div>
 
-            <label style={styles.label}>
-              Instrument hint
-              <input
-                style={styles.input}
-                value={instrumentHint}
-                onChange={(e) => setInstrumentHint(e.target.value)}
-                placeholder="guitar"
-              />
-            </label>
+              <div className="jams-form__row">
+                <label>
+                  Instrument hint
+                  <textarea
+                    value={instrumentHint}
+                    onChange={(e) => setInstrumentHint(e.target.value)}
+                    placeholder="Start with a mellow Rhodes loop and soft sidechained kick..."
+                    rows={3}
+                  />
+                </label>
+              </div>
 
-            {error && <p style={styles.error}>{error}</p>}
+              <button
+                type="submit"
+                className="jams-form__submit"
+                disabled={submitting}
+              >
+                {submitting ? "Creating..." : "Create Jam"}
+              </button>
+            </form>
+          </div>
 
-            <button style={styles.button} type="submit" disabled={submitting}>
-              {submitting ? "Saving..." : "Save Jam"}
-            </button>
-          </form>
-        </div>
+          {/* RIGHT: list */}
+          <div className="jams-list-card">
+            <div className="jams-list-header">
+              <h2>All jams</h2>
+              {loading && <span className="pill pill--loading">Loading…</span>}
+              {!loading && jams.length === 0 && (
+                <span className="pill">No jams yet</span>
+              )}
+              {error && <span className="pill pill--error">{error}</span>}
+            </div>
 
-        {/* Right: list */}
-        <div style={styles.listCard}>
-          <h2 style={styles.sectionTitle}>Your Jams</h2>
-          {jams.length === 0 ? (
-            <p>No jams yet. Add one on the left.</p>
-          ) : (
-            <ul style={styles.list}>
-              {jams.map((jam) => (
-                <li key={jam.id} style={styles.card}>
-                  <div style={styles.cardHeader}>
-                    <div>
-                      <span style={styles.cardTitle}>{jam.title}</span>
-                      {jam.bpm != null && (
-                        <span style={styles.badge}>{jam.bpm} bpm</span>
-                      )}
+            {!loading && (
+              <div className="jams-grid">
+                {jams.map((jam) => (
+                  <article key={jam.id} className="jam-card">
+                    <div className="jam-card__header">
+                      <h3>{jam.title}</h3>
+                      <button
+                        type="button"
+                        className="jam-card__delete"
+                        onClick={() => handleDelete(jam.id)}
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <button
-                      style={styles.deleteButton}
-                      type="button"
-                      onClick={() => handleDelete(jam.id)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div style={styles.cardMeta}>
-                    {jam.key && <span>{jam.key}</span>}
-                    {jam.genre && <span> · {jam.genre}</span>}
-                  </div>
-                  {jam.instrumentHint && (
-                    <p style={styles.hint}>🎸 {jam.instrumentHint}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+
+                    <div className="jam-card__meta">
+                      {jam.key && <span>{jam.key}</span>}
+                      {jam.bpm && <span>{jam.bpm} bpm</span>}
+                      {jam.genre && <span>{jam.genre}</span>}
+                    </div>
+
+                    {jam.instrumentHint && (
+                      <p className="jam-card__hint">{jam.instrumentHint}</p>
+                    )}
+
+                    <div className="jam-card__footer">
+                      <span className="jam-card__date">
+                        {new Date(jam.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
-};
-
-const styles: any = {
-  page: {
-    maxWidth: "1100px",
-    margin: "0 auto",
-  },
-  title: {
-    fontSize: "1.6rem",
-    marginBottom: "1rem",
-  },
-  subtitle: {
-  fontSize: "0.85rem",
-  color: "#9ca3af",
-  marginBottom: "0.75rem",
-  },
-  layout: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1.2fr) minmax(0, 2fr)",
-    gap: "1.5rem",
-    alignItems: "flex-start",
-  },
-  sectionTitle: {
-    fontSize: "1.1rem",
-    marginBottom: "0.75rem",
-  },
-  formCard: {
-    background: "rgba(15, 23, 42, 0.95)",
-    borderRadius: "0.75rem",
-    padding: "1.25rem",
-    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.5)",
-    border: "1px solid rgba(148, 163, 184, 0.35)",
-  },
-  listCard: {
-    background: "rgba(15, 23, 42, 0.85)",
-    borderRadius: "0.75rem",
-    padding: "1.25rem",
-    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.45)",
-    border: "1px solid rgba(148, 163, 184, 0.3)",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-  },
-  label: {
-    fontSize: "0.85rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.35rem",
-  },
-  input: {
-    padding: "0.45rem 0.6rem",
-    borderRadius: "0.5rem",
-    border: "1px solid rgba(148, 163, 184, 0.5)",
-    background: "rgba(15, 23, 42, 0.9)",
-    color: "#e5e7eb",
-    outline: "none",
-  },
-  button: {
-    marginTop: "0.5rem",
-    padding: "0.6rem 0.9rem",
-    borderRadius: "999px",
-    border: "none",
-    fontWeight: 600,
-    fontSize: "0.9rem",
-    cursor: "pointer",
-    background:
-      "radial-gradient(circle at 0% 0%, #22c55e 0%, #22d3ee 30%, #6366f1 70%, #ec4899 100%)",
-  },
-  list: {
-    listStyle: "none",
-    padding: 0,
-    margin: 0,
-    display: "grid",
-    gap: "0.75rem",
-  },
-  card: {
-    background: "rgba(15, 23, 42, 0.95)",
-    borderRadius: "0.75rem",
-    padding: "0.9rem 1rem",
-    border: "1px solid rgba(148, 163, 184, 0.25)",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: "0.25rem",
-    gap: "0.75rem",
-  },
-  cardTitle: {
-    fontWeight: 600,
-    fontSize: "1rem",
-    marginRight: "0.5rem",
-  },
-  badge: {
-    marginLeft: "0.3rem",
-    padding: "0.15rem 0.5rem",
-    borderRadius: "999px",
-    fontSize: "0.75rem",
-    border: "1px solid rgba(248, 250, 252, 0.3)",
-  },
-  deleteButton: {
-    border: "none",
-    background: "transparent",
-    color: "#fca5a5",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-  },
-  cardMeta: {
-    fontSize: "0.85rem",
-    color: "#9ca3af",
-    marginBottom: "0.25rem",
-  },
-  hint: {
-    fontSize: "0.8rem",
-    color: "#d1d5db",
-    marginTop: "0.1rem",
-  },
-  error: {
-    fontSize: "0.8rem",
-    color: "#fecaca",
-  },
 };
 
 export default JamsPage;
