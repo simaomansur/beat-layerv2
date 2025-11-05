@@ -1,17 +1,8 @@
 // src/pages/JamsPage.tsx
 import React, { useEffect, useState, FormEvent } from "react";
-import { fetchJams, createJam, deleteJam } from "../api";
-import "../components/JamsPage.css";
-
-type Jam = {
-  id: string;
-  title: string;
-  key: string;
-  bpm: number;
-  genre: string;
-  instrumentHint: string;
-  createdAt: string; // adjust if your backend uses a different field name
-};
+import { fetchJams, createJam, deleteJam, } from "../api";
+import type { Jam } from "../api";
+import "../components/JamsPage.css"; // or "../pages/JamsPage.css" if you moved it
 
 const MIN_BPM = 40;
 const MAX_BPM = 260;
@@ -35,11 +26,12 @@ const JamsPage: React.FC = () => {
     const load = async () => {
       try {
         const data = await fetchJams();
-        // Optional: sort newest first if backend doesn’t already
-        const sorted = [...data].sort(
-          (a: Jam, b: Jam) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+
+        // Safely sort by newest first (handles null/undefined createdAt)
+        const getTime = (j: Jam) =>
+          j.createdAt ? new Date(j.createdAt).getTime() : 0;
+
+        const sorted = [...data].sort((a, b) => getTime(b) - getTime(a));
         setJams(sorted);
       } catch (err) {
         console.error(err);
@@ -85,10 +77,10 @@ const JamsPage: React.FC = () => {
     try {
       const newJam = await createJam({
         title: title.trim(),
-        key: keyVal.trim(),
+        key: keyVal.trim() || null,
         bpm: bpmNumber,
-        genre: genre.trim(),
-        instrumentHint: instrumentHint.trim(),
+        genre: genre.trim() || null,
+        instrumentHint: instrumentHint.trim() || null,
       });
 
       // Prepend the new jam to the list
@@ -233,7 +225,7 @@ const JamsPage: React.FC = () => {
 
                     <div className="jam-card__meta">
                       {jam.key && <span>{jam.key}</span>}
-                      {jam.bpm && <span>{jam.bpm} bpm</span>}
+                      {jam.bpm !== null && <span>{jam.bpm} bpm</span>}
                       {jam.genre && <span>{jam.genre}</span>}
                     </div>
 
@@ -242,9 +234,11 @@ const JamsPage: React.FC = () => {
                     )}
 
                     <div className="jam-card__footer">
-                      <span className="jam-card__date">
-                        {new Date(jam.createdAt).toLocaleString()}
-                      </span>
+                      {jam.createdAt && (
+                        <span className="jam-card__date">
+                          {new Date(jam.createdAt).toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   </article>
                 ))}
