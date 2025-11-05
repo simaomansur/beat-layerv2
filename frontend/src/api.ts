@@ -58,3 +58,12 @@ export async function deleteJam(id: string) {
   }
 }
 
+export async function fetchCurrentUser() {
+  const res = await fetch("http://localhost:8080/users/me");
+  if (!res.ok) {
+    throw new Error(`Failed to load current user: ${res.status}`);
+  }
+  return res.json(); // { id, handle, email, createdAt }
+}
+
+

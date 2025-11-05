@@ -1,10 +1,11 @@
 import React, { useEffect, useState, FormEvent } from "react";
-import { fetchJams, createJam, deleteJam } from "../api";
+import { fetchJams, createJam, deleteJam, fetchCurrentUser } from "../api";
 
 const JamsPage = () => {
   const [jams, setJams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [me, setMe] = useState<any | null>(null);
 
   // form state
   const [title, setTitle] = useState("");
@@ -17,7 +18,13 @@ const JamsPage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchJams();
+        // load current user and jams in parallel
+        const [user, data] = await Promise.all([
+          fetchCurrentUser(),
+          fetchJams(),
+        ]);
+
+        setMe(user);
         setJams(data);
       } catch (err: any) {
         console.error(err);
@@ -28,6 +35,7 @@ const JamsPage = () => {
     };
     load();
   }, []);
+
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -86,6 +94,12 @@ const JamsPage = () => {
   return (
     <div style={styles.page}>
       <h1 style={styles.title}>Jams</h1>
+
+      {me && (
+        <p style={styles.subtitle}>
+          Signed in as <strong>{me.handle}</strong>
+        </p>
+      )}
 
       <div style={styles.layout}>
         {/* Left: form */}
@@ -200,6 +214,11 @@ const styles: any = {
   title: {
     fontSize: "1.6rem",
     marginBottom: "1rem",
+  },
+  subtitle: {
+  fontSize: "0.85rem",
+  color: "#9ca3af",
+  marginBottom: "0.75rem",
   },
   layout: {
     display: "grid",
