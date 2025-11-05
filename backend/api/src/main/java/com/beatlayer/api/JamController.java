@@ -1,12 +1,9 @@
 package com.beatlayer.api;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.UUID;
@@ -17,12 +14,14 @@ import java.util.UUID;
 public class JamController {
 
   private final JamRepository repo;
+  private final UserRepository userRepo;
 
-  public JamController(JamRepository repo) {
+  public JamController(JamRepository repo, UserRepository userRepo) {
     this.repo = repo;
+    this.userRepo = userRepo;
   }
 
-  // Create
+  // Create a jam
   @PostMapping
   public JamDtos.JamResponse create(@Valid @RequestBody JamDtos.CreateJamRequest req) {
     Jam j = new Jam();
@@ -32,8 +31,11 @@ public class JamController {
     j.setGenre(req.genre());
     j.setInstrumentHint(req.instrumentHint());
 
-    // TODO: replace this with real authenticated user later
-    j.setCreatedBy(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+    // Use the seeded dev user for now
+    UUID devId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    User devUser = userRepo.findById(devId)
+        .orElseThrow(() -> new IllegalStateException("Dev user not found"));
+    j.setCreatedBy(devUser);
 
     j = repo.save(j);
     return JamDtos.fromEntity(j);
@@ -50,8 +52,7 @@ public class JamController {
       @RequestParam(required = false) Integer maxBpm,
       @RequestParam(required = false, name = "q") String query
   ) {
-    // --- build Sort ---
-    // sort looks like: "field,dir" e.g. "bpm,asc"
+    // sort format: "field,dir" e.g. "bpm,asc"
     String[] sortParts = sort.split(",");
     String sortField = sortParts[0];
     String sortDir = (sortParts.length > 1) ? sortParts[1].toLowerCase() : "desc";
@@ -59,31 +60,30 @@ public class JamController {
     Sort.Direction direction = sortDir.equals("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
     Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
 
-    // --- build Specification ---
     Specification<Jam> spec = Specification.where(null);
 
     if (genre != null && !genre.isBlank()) {
       String g = genre.toLowerCase();
-      spec = spec.and((root, query1, cb) ->
+      spec = spec.and((root, q1, cb) ->
           cb.equal(cb.lower(root.get("genre")), g)
       );
     }
 
     if (minBpm != null) {
-      spec = spec.and((root, query1, cb) ->
+      spec = spec.and((root, q1, cb) ->
           cb.ge(root.get("bpm"), minBpm)
       );
     }
 
     if (maxBpm != null) {
-      spec = spec.and((root, query1, cb) ->
+      spec = spec.and((root, q1, cb) ->
           cb.le(root.get("bpm"), maxBpm)
       );
     }
 
     if (query != null && !query.isBlank()) {
       String pattern = "%" + query.toLowerCase() + "%";
-      spec = spec.and((root, query1, cb) ->
+      spec = spec.and((root, q1, cb) ->
           cb.or(
               cb.like(cb.lower(root.get("title")), pattern),
               cb.like(cb.lower(root.get("genre")), pattern),
@@ -110,8 +110,7 @@ public class JamController {
     );
   }
 
-
-  // Get one by id
+  // Get one jam
   @GetMapping("/{id}")
   public JamDtos.JamResponse getOne(@PathVariable UUID id) {
     Jam j = repo.findById(id)
@@ -119,7 +118,7 @@ public class JamController {
     return JamDtos.fromEntity(j);
   }
 
-  // Update (partial)
+  // Update jam (partial)
   @PutMapping("/{id}")
   public JamDtos.JamResponse update(
       @PathVariable UUID id,
@@ -131,7 +130,7 @@ public class JamController {
     if (req.title() != null && !req.title().isBlank()) {
       j.setTitle(req.title());
     }
-    if (req.key() != null) {
+    if (req.key() != null && !req.key().isBlank()) {
       j.setKey(req.key());
     }
     if (req.bpm() != null) {
@@ -148,7 +147,7 @@ public class JamController {
     return JamDtos.fromEntity(j);
   }
 
-  // Delete
+  // Delete jam
   @DeleteMapping("/{id}")
   public void delete(@PathVariable UUID id) {
     if (!repo.existsById(id)) {

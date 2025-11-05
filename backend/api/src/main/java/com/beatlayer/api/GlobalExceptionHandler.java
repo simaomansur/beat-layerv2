@@ -42,12 +42,12 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<?> handleGeneric(Exception ex) {
-    // You can log ex here if you want
     Map<String, Object> body = new HashMap<>();
     body.put("timestamp", Instant.now().toString());
     body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
     body.put("error", "Internal Server Error");
-    body.put("message", "Something went wrong on the server.");
+    // For dev, show the real message so you can see DB errors easily:
+    body.put("message", ex.getMessage());
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
   }
 }

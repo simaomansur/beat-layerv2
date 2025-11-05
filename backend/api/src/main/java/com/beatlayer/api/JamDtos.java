@@ -1,16 +1,28 @@
 package com.beatlayer.api;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public class JamDtos {
 
   public record CreateJamRequest(
       @NotBlank String title,
-      // allow things like C, C#, Db, Am, F#m, etc. (loose for now)
-      @NotBlank @Pattern(regexp = "^[A-G](#|b)?m?$") String key,
-      @Min(40) @Max(240) int bpm,
+      @NotBlank String key,
+      @NotNull @Min(40) @Max(240) Integer bpm,
+      String genre,
+      String instrumentHint
+  ) {}
+
+  // Partial update: all nullable, we only apply non-null fields
+  public record UpdateJamRequest(
+      String title,
+      String key,
+      Integer bpm,
       String genre,
       String instrumentHint
   ) {}
@@ -19,33 +31,28 @@ public class JamDtos {
       UUID id,
       String title,
       String key,
-      int bpm,
-      String genre,
-      String instrumentHint
-  ) {}
-
-  public record UpdateJamRequest(
-      @Size(min = 1, max = 200, message = "Title must be between 1 and 200 characters")
-      String title,
-
-      String key,
-
-      @Min(value = 40, message = "BPM must be at least 40")
-      @Max(value = 300, message = "BPM must be at most 300")
       Integer bpm,
-
       String genre,
-      String instrumentHint
+      String instrumentHint,
+      UUID createdById,
+      String createdByHandle,
+      Instant createdAt,
+      Instant updatedAt
   ) {}
 
   public static JamResponse fromEntity(Jam j) {
+    User u = j.getCreatedBy();
     return new JamResponse(
         j.getId(),
         j.getTitle(),
-        j.getKey(),          // <-- now a String
+        j.getKey(),
         j.getBpm(),
         j.getGenre(),
-        j.getInstrumentHint()
+        j.getInstrumentHint(),
+        u != null ? u.getId() : null,
+        u != null ? u.getHandle() : null,
+        j.getCreatedAt(),
+        j.getUpdatedAt()
     );
   }
 }
