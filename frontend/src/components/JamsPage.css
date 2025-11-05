@@ -107,6 +107,7 @@ textarea {
   font: inherit;
   outline: none;
   box-sizing: border-box;
+  resize: none;
 }
 
 input:focus,
