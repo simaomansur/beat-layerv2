@@ -24,17 +24,16 @@ public class JamController {
   // Create a jam
   @PostMapping
   public JamDtos.JamResponse create(@Valid @RequestBody JamDtos.CreateJamRequest req) {
+
+  User devUser = userRepo.findByHandle("dev")
+      .orElseThrow(() -> new RuntimeException("Dev user not found"));
+
     Jam j = new Jam();
     j.setTitle(req.title());
     j.setKey(req.key());
     j.setBpm(req.bpm());
     j.setGenre(req.genre());
     j.setInstrumentHint(req.instrumentHint());
-
-    // Use the seeded dev user for now
-    UUID devId = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    User devUser = userRepo.findById(devId)
-        .orElseThrow(() -> new IllegalStateException("Dev user not found"));
     j.setCreatedBy(devUser);
 
     j = repo.save(j);

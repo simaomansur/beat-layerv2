@@ -34,14 +34,13 @@ public class JamDtos {
       Integer bpm,
       String genre,
       String instrumentHint,
-      UUID createdById,
-      String createdByHandle,
       Instant createdAt,
-      Instant updatedAt
+      UUID createdById,
+      String createdByUsername
   ) {}
 
   public static JamResponse fromEntity(Jam j) {
-    User u = j.getCreatedBy();
+    User u = j.getCreatedBy(); // should never be null for a valid Jam
     return new JamResponse(
         j.getId(),
         j.getTitle(),
@@ -49,10 +48,9 @@ public class JamDtos {
         j.getBpm(),
         j.getGenre(),
         j.getInstrumentHint(),
-        u != null ? u.getId() : null,
-        u != null ? u.getHandle() : null,
         j.getCreatedAt(),
-        j.getUpdatedAt()
+        u != null ? u.getId() : null,
+        u != null ? u.getHandle() : null  // or getHandle() if that’s your field
     );
   }
 }
