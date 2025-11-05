@@ -14,11 +14,13 @@ export type Jam = {
 const BASE_URL = "http://localhost:8080"; // Spring Boot backend
 
 export async function fetchJams(): Promise<Jam[]> {
-  const res = await fetch(`${BASE_URL}/jams`);
+  const res = await fetch("http://localhost:8080/jams?page=0&size=50");
   if (!res.ok) {
-    throw new Error(`Failed to fetch jams: ${res.status}`);
+    throw new Error("Failed to fetch jams");
   }
-  return res.json();
+
+  const page = await res.json();  // PageResponse<Jam>
+  return page.content;            // 👈 just the array
 }
 
 export type CreateJamRequest = {
