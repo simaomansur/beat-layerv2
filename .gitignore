@@ -25,3 +25,6 @@ dist/
 # === Environment ===
 .env
 .env.*
+
+# === Local Audio Uploads ===
+backend/api/uploads/
