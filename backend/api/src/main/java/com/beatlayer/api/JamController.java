@@ -5,6 +5,10 @@ import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -15,10 +19,12 @@ public class JamController {
 
   private final JamRepository repo;
   private final UserRepository userRepo;
+  private final AudioStorageService audioStorageService;
 
-  public JamController(JamRepository repo, UserRepository userRepo) {
+  public JamController(JamRepository repo, UserRepository userRepo, AudioStorageService audioStorageService) {
     this.repo = repo;
     this.userRepo = userRepo;
+    this.audioStorageService = audioStorageService;
   }
 
   // Create a jam
@@ -153,5 +159,38 @@ public class JamController {
       throw new NotFoundException("Jam with id " + id + " not found");
     }
     repo.deleteById(id);
+  }
+
+  @PostMapping("/{jamId}/layers/base")
+  public ResponseEntity<?> uploadBaseLayer(
+      @PathVariable UUID jamId,
+      @RequestParam("audio") MultipartFile audioFile,
+      @RequestParam(name = "loopBars", required = false) Integer loopBars
+  ) throws Exception {
+    Jam jam = repo.findById(jamId)
+        .orElseThrow(() -> new NotFoundException("Jam with id " + jamId + " not found"));
+
+    if (audioFile.isEmpty()) {
+      return ResponseEntity.badRequest().body("Audio file is required");
+    }
+
+    // 1) Store file on disk (using LocalAudioStorageService) and get its URL
+    String audioUrl = audioStorageService.storeBaseLayerAudio(
+        audioFile,
+        jam.getId().toString()
+    );
+
+    // 2) Save URL on the jam
+    jam.setBaseAudioUrl(audioUrl);
+    repo.save(jam);
+
+    System.out.println(
+        "Stored base layer for jam " + jam.getId() +
+        " at " + audioUrl +
+        " loopBars=" + loopBars
+    );
+
+    // 3) We don't need to return anything special yet
+    return ResponseEntity.status(HttpStatus.CREATED).build();
   }
 }

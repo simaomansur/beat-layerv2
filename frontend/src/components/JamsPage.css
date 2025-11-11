@@ -251,3 +251,34 @@ textarea:focus {
   display: flex;
   justify-content: flex-end;
 }
+
+.jams-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.create-jam-button {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  font-size: 0.9rem;
+  background: #6d5dfc;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.create-jam-button:hover {
+  opacity: 0.9;
+}
+
+.jam-card__audio {
+  margin-top: 0.5rem;
+}
+
+.jam-card__audio audio {
+  width: 100%;
+}

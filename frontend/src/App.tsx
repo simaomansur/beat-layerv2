@@ -5,6 +5,7 @@ import HomePage from "./pages/HomePage";
 import JamsPage from "./pages/JamsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AboutPage from "./pages/AboutPage";
+import LayerStudioPage from "./pages/LayerStudioPage";
 import "./App.css";
 
 const App = () => {
@@ -34,6 +35,7 @@ const App = () => {
           <Route path="/jams" element={<JamsPage />} />
           <Route path="/profile/:username" element={<ProfilePage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/studio/new" element={<LayerStudioPage />} />
         </Routes>
       </main>
     </div>

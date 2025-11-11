@@ -33,6 +33,10 @@ public class Jam {
   @Column(name = "instrument_hint")
   private String instrumentHint;
 
+  // 👇 NEW: where the base layer audio file is accessible from (e.g. /audio/xyz.webm)
+  @Column(name = "base_audio_url")
+  private String baseAudioUrl;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -114,6 +118,15 @@ public class Jam {
 
   public void setInstrumentHint(String instrumentHint) {
     this.instrumentHint = instrumentHint;
+  }
+
+  // 👇 NEW getter/setter
+  public String getBaseAudioUrl() {
+    return baseAudioUrl;
+  }
+
+  public void setBaseAudioUrl(String baseAudioUrl) {
+    this.baseAudioUrl = baseAudioUrl;
   }
 
   public Instant getCreatedAt() {

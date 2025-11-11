@@ -36,7 +36,8 @@ public class JamDtos {
       String instrumentHint,
       Instant createdAt,
       UUID createdById,
-      String createdByUsername
+      String createdByUsername,
+      String baseAudioUrl
   ) {}
 
   public static JamResponse fromEntity(Jam j) {
@@ -50,7 +51,8 @@ public class JamDtos {
         j.getInstrumentHint(),
         j.getCreatedAt(),
         u != null ? u.getId() : null,
-        u != null ? u.getHandle() : null  // or getHandle() if that’s your field
+        u != null ? u.getHandle() : null,  // or getHandle() if that’s your field
+        j.getBaseAudioUrl()
     );
   }
 }

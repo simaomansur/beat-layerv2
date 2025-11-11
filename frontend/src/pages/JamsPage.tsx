@@ -1,25 +1,14 @@
 // src/pages/JamsPage.tsx
-import React, { useEffect, useState, FormEvent } from "react";
-import { fetchJams, createJam, deleteJam, } from "../api";
+import React, { useEffect, useState } from "react";
+import { fetchJams, deleteJam, BASE_URL } from "../api"; // 👈 add BASE_URL here
 import type { Jam } from "../api";
-import "../components/JamsPage.css"; // or "../pages/JamsPage.css" if you moved it
-
-const MIN_BPM = 40;
-const MAX_BPM = 260;
+import { Link } from "react-router-dom";
+import "../components/JamsPage.css";
 
 const JamsPage: React.FC = () => {
   const [jams, setJams] = useState<Jam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // form state
-  const [title, setTitle] = useState("");
-  const [keyVal, setKeyVal] = useState("");
-  const [bpm, setBpm] = useState<string>("");
-  const [genre, setGenre] = useState("");
-  const [instrumentHint, setInstrumentHint] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
   // Load jams on mount
   useEffect(() => {
@@ -27,7 +16,6 @@ const JamsPage: React.FC = () => {
       try {
         const data = await fetchJams();
 
-        // Safely sort by newest first (handles null/undefined createdAt)
         const getTime = (j: Jam) =>
           j.createdAt ? new Date(j.createdAt).getTime() : 0;
 
@@ -43,56 +31,6 @@ const JamsPage: React.FC = () => {
 
     load();
   }, []);
-
-  const resetForm = () => {
-    setTitle("");
-    setKeyVal("");
-    setBpm("");
-    setGenre("");
-    setInstrumentHint("");
-    setFormError(null);
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-
-    const bpmNumber = Number(bpm);
-    if (
-      Number.isNaN(bpmNumber) ||
-      bpmNumber < MIN_BPM ||
-      bpmNumber > MAX_BPM
-    ) {
-      setFormError(`BPM must be between ${MIN_BPM} and ${MAX_BPM}.`);
-      return;
-    }
-
-    if (!title.trim()) {
-      setFormError("Title is required.");
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const newJam = await createJam({
-        title: title.trim(),
-        key: keyVal.trim() || null,
-        bpm: bpmNumber,
-        genre: genre.trim() || null,
-        instrumentHint: instrumentHint.trim() || null,
-      });
-
-      // Prepend the new jam to the list
-      setJams((prev) => [newJam, ...prev]);
-      resetForm();
-    } catch (err) {
-      console.error(err);
-      setFormError("Failed to create jam. Check your inputs and try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Delete this jam?")) return;
@@ -110,97 +48,22 @@ const JamsPage: React.FC = () => {
     <div className="jams-page">
       <div className="jams-page__inner">
         <header className="jams-header">
-          <h1>Beat Layer – Jams</h1>
-          <p>Create and explore groove ideas to build on later.</p>
-        </header>
-
-        <section className="jams-layout">
-          {/* LEFT: form */}
-          <div className="jams-form-card">
-            <h2>Create a new jam</h2>
-            <form onSubmit={handleSubmit} className="jams-form">
-              {formError && (
-                <div className="jams-form__error">{formError}</div>
-              )}
-
-              <div className="jams-form__row">
-                <label>
-                  Title<span className="required">*</span>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Lo-fi midnight groove"
-                    required
-                  />
-                </label>
-              </div>
-
-              <div className="jams-form__row jams-form__row--split">
-                <label>
-                  Key
-                  <input
-                    type="text"
-                    value={keyVal}
-                    onChange={(e) => setKeyVal(e.target.value)}
-                    placeholder="e.g. C#m"
-                  />
-                </label>
-
-                <label>
-                  BPM
-                  <input
-                    type="number"
-                    value={bpm}
-                    onChange={(e) => setBpm(e.target.value)}
-                    placeholder="120"
-                    min={MIN_BPM}
-                    max={MAX_BPM}
-                  />
-                  <small className="field-hint">
-                    {MIN_BPM}–{MAX_BPM} bpm
-                  </small>
-                </label>
-              </div>
-
-              <div className="jams-form__row">
-                <label>
-                  Genre
-                  <input
-                    type="text"
-                    value={genre}
-                    onChange={(e) => setGenre(e.target.value)}
-                    placeholder="Lo-fi / hip-hop / trap"
-                  />
-                </label>
-              </div>
-
-              <div className="jams-form__row">
-                <label>
-                  Instrument hint
-                  <textarea
-                    value={instrumentHint}
-                    onChange={(e) => setInstrumentHint(e.target.value)}
-                    placeholder="Start with a mellow Rhodes loop and soft sidechained kick..."
-                    rows={3}
-                  />
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                className="jams-form__submit"
-                disabled={submitting}
-              >
-                {submitting ? "Creating..." : "Create Jam"}
-              </button>
-            </form>
+          <div>
+            <h1>Beat Layer – Jams</h1>
+            <p>Browse base grooves and find something to build on.</p>
           </div>
 
-          {/* RIGHT: list */}
+          {/* New flow: creation happens in the Studio */}
+          <Link to="/studio/new" className="create-jam-button">
+            Create Jam
+          </Link>
+        </header>
+
+        <section className="jams-layout jams-layout--list-only">
           <div className="jams-list-card">
             <div className="jams-list-header">
               <h2>All jams</h2>
+
               {loading && <span className="pill pill--loading">Loading…</span>}
               {!loading && jams.length === 0 && (
                 <span className="pill">No jams yet</span>
@@ -231,6 +94,16 @@ const JamsPage: React.FC = () => {
 
                     {jam.instrumentHint && (
                       <p className="jam-card__hint">{jam.instrumentHint}</p>
+                    )}
+
+                    {/* 👇 NEW: audio player if a base layer exists */}
+                    {jam.baseAudioUrl && (
+                      <div className="jam-card__audio">
+                        <audio
+                          controls
+                          src={`${BASE_URL}${jam.baseAudioUrl}`}
+                        />
+                      </div>
                     )}
 
                     <div className="jam-card__footer">
