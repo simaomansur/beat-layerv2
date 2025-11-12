@@ -1,12 +1,17 @@
 package com.beatlayer.api;
 
-import java.time.Instant;
 import java.util.UUID;
+import java.time.Instant;
 
 public class UserDtos {
 
-  public record RegisterUserRequest(
+  public record RegisterRequest(
       String handle,
+      String email,
+      String password
+  ) {}
+
+  public record LoginRequest(
       String email,
       String password
   ) {}
@@ -20,10 +25,10 @@ public class UserDtos {
 
   public static UserResponse fromEntity(User u) {
     return new UserResponse(
-        u.getId(),
-        u.getHandle(),
-        u.getEmail(),
-        u.getCreatedAt()
+      u.getId(),
+      u.getHandle(),
+      u.getEmail(),
+      u.getCreatedAt()
     );
   }
 }

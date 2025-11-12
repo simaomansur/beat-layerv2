@@ -34,7 +34,7 @@ public class User {
     }
   }
 
-  // Getters and setters
+  // getters & setters
 
   public UUID getId() {
     return id;

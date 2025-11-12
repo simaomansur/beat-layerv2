@@ -1,28 +1,36 @@
 package com.beatlayer.api;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/users")
-@CrossOrigin(origins = "http://localhost:5173")
 public class UserController {
 
-  private final UserRepository userRepo;
+    private final UserService userService;
 
-  public UserController(UserRepository userRepo) {
-    this.userRepo = userRepo;
-  }
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
 
-  // For now: always return the dev user as "me"
-  @GetMapping("/me")
-  public UserDtos.UserResponse me() {
-    UUID devId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    @PostMapping("/register")
+    public ResponseEntity<UserDtos.UserResponse> register(
+            @RequestBody UserDtos.RegisterRequest req) {
+        User newUser = userService.registerNewUser(
+                req.handle(), req.email(), req.password());
+        return ResponseEntity.ok(UserDtos.fromEntity(newUser));
+    }
 
-    User dev = userRepo.findById(devId)
-        .orElseThrow(() -> new RuntimeException("Dev user not found"));
+    @PostMapping("/login")
+    public ResponseEntity<UserDtos.UserResponse> login(
+            @RequestBody UserDtos.LoginRequest req) {
+        User user = userService.authenticate(req.email(), req.password());
+        return ResponseEntity.ok(UserDtos.fromEntity(user));
+    }
 
-    return UserDtos.fromEntity(dev);
-  }
+    @GetMapping("/me")
+    public ResponseEntity<UserDtos.UserResponse> me(/* inject auth principal later */) {
+        // TODO: get current user from security context
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
 }

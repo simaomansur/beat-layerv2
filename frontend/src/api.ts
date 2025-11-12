@@ -59,6 +59,13 @@ export async function deleteJam(id: string) {
   }
 }
 
+export type UserResponse = {
+  id: string;
+  handle: string;
+  email: string;
+  createdAt: string;
+};
+
 export async function fetchCurrentUser() {
   const res = await fetch(`${BASE_URL}/users/me`);
   if (!res.ok) {
