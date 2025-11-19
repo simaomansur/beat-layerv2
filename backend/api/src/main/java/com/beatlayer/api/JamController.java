@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.util.List;
 import java.util.UUID;
@@ -29,19 +30,17 @@ public class JamController {
 
   // Create a jam
   @PostMapping
-  public JamDtos.JamResponse create(@Valid @RequestBody JamDtos.CreateJamRequest req) {
-
-  User devUser = userRepo.findByHandle("dev")
-      .orElseThrow(() -> new RuntimeException("Dev user not found"));
-
+  public JamDtos.JamResponse create(
+      @Valid @RequestBody JamDtos.CreateJamRequest req,
+      @AuthenticationPrincipal User currentUser
+  ) {
     Jam j = new Jam();
     j.setTitle(req.title());
     j.setKey(req.key());
     j.setBpm(req.bpm());
     j.setGenre(req.genre());
     j.setInstrumentHint(req.instrumentHint());
-    j.setCreatedBy(devUser);
-
+    j.setCreatedBy(currentUser);  // 👈 use the logged-in user
     j = repo.save(j);
     return JamDtos.fromEntity(j);
   }
