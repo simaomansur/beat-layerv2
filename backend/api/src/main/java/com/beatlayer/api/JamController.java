@@ -8,8 +8,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
@@ -153,11 +157,35 @@ public class JamController {
 
   // Delete jam
   @DeleteMapping("/{id}")
-  public void delete(@PathVariable UUID id) {
-    if (!repo.existsById(id)) {
-      throw new NotFoundException("Jam with id " + id + " not found");
+  public ResponseEntity<Void> deleteJam(
+      @PathVariable UUID id,
+      @AuthenticationPrincipal User currentUser
+  ) {
+    Jam jam = repo.findById(id)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+
+    // Optional: enforce ownership
+    if (currentUser != null &&
+        jam.getCreatedBy() != null &&
+        !jam.getCreatedBy().getId().equals(currentUser.getId())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your jam");
     }
-    repo.deleteById(id);
+
+    // Delete base audio file if it exists
+    String url = jam.getBaseAudioUrl(); // adjust getter name if needed
+    if (url != null && url.startsWith("/audio/")) {
+      String fileName = url.substring("/audio/".length());
+      Path audioPath = Paths.get("uploads", "audio", fileName);
+      try {
+        Files.deleteIfExists(audioPath);
+      } catch (Exception e) {
+        // You can log this; we don't fail the delete if cleanup fails
+        System.err.println("Failed to delete audio file: " + audioPath + " -> " + e.getMessage());
+      }
+    }
+
+    repo.delete(jam);
+    return ResponseEntity.noContent().build();
   }
 
   @PostMapping("/{jamId}/layers/base")

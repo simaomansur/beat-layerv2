@@ -32,13 +32,16 @@ public class SecurityConfig {
         .csrf(csrf -> csrf.disable())
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
-            // public auth endpoints
+            // 🔓 Static audio files must be public, and this rule MUST come first
+            .requestMatchers("/audio/**").permitAll()
+
+            // 🔓 Public auth endpoints
             .requestMatchers("/users/register", "/users/login").permitAll()
 
-            // public read-only jams
+            // 🔓 Public read-only jams
             .requestMatchers(HttpMethod.GET, "/jams", "/jams/**").permitAll()
 
-            // everything else requires a valid JWT
+            // 🔒 Everything else requires a valid JWT
             .anyRequest().authenticated()
         );
 
