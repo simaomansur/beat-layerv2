@@ -1,6 +1,7 @@
+// src/auth/auth.context.tsx
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import authService from "./auth.service";
-import type { UserResponse } from "../api";
+import authService, { UserResponse } from "./auth.service";
+import { clearToken } from "./token";
 
 type AuthContextType = {
   user: UserResponse | null;
@@ -17,7 +18,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     const loggedUser = await authService.login({ email, password });
     setUser(loggedUser);
-    // Optionally store token/localStorage later
   };
 
   const register = async (handle: string, email: string, password: string) => {
@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = () => {
     setUser(null);
-    // clear token/localStorage if used
+    clearToken();
   };
 
   return (

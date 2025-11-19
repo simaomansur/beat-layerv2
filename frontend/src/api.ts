@@ -1,5 +1,16 @@
 // src/api.ts
 
+import { getToken } from "./auth/token";
+
+function authHeaders(): HeadersInit {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export type Jam = {
   id: string;
   title: string;
@@ -37,6 +48,7 @@ export async function createJam(payload: CreateJamRequest): Promise<Jam> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -51,6 +63,9 @@ export async function createJam(payload: CreateJamRequest): Promise<Jam> {
 export async function deleteJam(id: string) {
   const res = await fetch(`${BASE_URL}/jams/${id}`, {
     method: "DELETE",
+    headers: {
+      ...authHeaders(),
+    },
   });
 
   if (!res.ok && res.status !== 404) {
@@ -102,6 +117,7 @@ export async function createJamWithBaseLayer(input: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
     },
     body: JSON.stringify({
       title,
@@ -109,9 +125,6 @@ export async function createJamWithBaseLayer(input: {
       bpm,
       genre: genre ?? null,
       instrumentHint: instrumentHint ?? null,
-      // If/when you add loopBars to the backend Jam entity,
-      // you can include it here as well.
-      // loopBars,
     }),
   });
 
@@ -129,6 +142,9 @@ export async function createJamWithBaseLayer(input: {
 
   const layerRes = await fetch(`${BASE_URL}/jams/${jam.id}/layers/base`, {
     method: "POST",
+    headers: {
+      ...authHeaders(),
+    },
     body: formData,
   });
 
@@ -136,7 +152,5 @@ export async function createJamWithBaseLayer(input: {
     throw new Error(`Failed to upload base layer: ${layerRes.status}`);
   }
 
-  // You could parse a Layer DTO here if your backend returns one,
-  // but for now we just return the jam so the caller can redirect.
   return jam;
 }

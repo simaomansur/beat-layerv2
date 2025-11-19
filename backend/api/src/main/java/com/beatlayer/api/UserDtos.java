@@ -23,6 +23,11 @@ public class UserDtos {
       Instant createdAt
   ) {}
 
+  public record AuthResponse(
+    String token,
+    UserResponse user
+  ) {}
+
   public static UserResponse fromEntity(User u) {
     return new UserResponse(
       u.getId(),
