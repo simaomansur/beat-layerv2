@@ -1,7 +1,6 @@
 package com.beatlayer.api.jam;
 
 import jakarta.persistence.*;
-
 import java.util.UUID;
 
 @Entity
@@ -9,20 +8,14 @@ import java.util.UUID;
 public class Tag {
 
   @Id
+  @GeneratedValue
   @Column(nullable = false, updatable = false)
   private UUID id;
 
-  @Column(nullable = false, unique = true, length = 64)
+  @Column(name = "name", nullable = false, length = 64, unique = true)
   private String name;
 
-  @PrePersist
-  public void prePersist() {
-    if (id == null) {
-      id = UUID.randomUUID();
-    }
-  }
-
-  // getters & setters
+  // ===== Getters & Setters =====
 
   public UUID getId() {
     return id;

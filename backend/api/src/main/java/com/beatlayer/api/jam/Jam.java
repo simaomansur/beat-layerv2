@@ -21,7 +21,7 @@ public class Jam {
   @JoinColumn(name = "created_by", nullable = false)
   private User createdBy;
 
-  // musical_key in the database
+  // maps to musical_key
   @Column(name = "musical_key", nullable = false)
   private String musicalKey;
 
@@ -37,14 +37,14 @@ public class Jam {
   @Column(name = "base_audio_url")
   private String baseAudioUrl;
 
-  // premium / credits
+  // Premium + credits
   @Column(name = "is_premium", nullable = false)
   private boolean premium = false;
 
   @Column(name = "layer_credit_cost", nullable = false)
   private Integer layerCreditCost = 1;
 
-  // contest fields
+  // Contest fields
   @Column(name = "is_contest", nullable = false)
   private boolean contest = false;
 
@@ -57,7 +57,7 @@ public class Jam {
   @Column(name = "is_locked", nullable = false)
   private boolean locked = false;
 
-  @Column(name = "created_at", nullable = false, updatable = false)
+  @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
   @Column(name = "updated_at", nullable = false)
@@ -65,19 +65,17 @@ public class Jam {
 
   @PrePersist
   public void prePersist() {
-    Instant now = Instant.now();
-
     if (id == null) {
       id = UUID.randomUUID();
     }
+    Instant now = Instant.now();
     if (createdAt == null) {
       createdAt = now;
     }
     if (updatedAt == null) {
       updatedAt = now;
     }
-    // enforce sane defaults in case something upstream forgets
-    if (layerCreditCost == null || layerCreditCost <= 0) {
+    if (layerCreditCost == null) {
       layerCreditCost = 1;
     }
   }
@@ -85,12 +83,9 @@ public class Jam {
   @PreUpdate
   public void preUpdate() {
     updatedAt = Instant.now();
-    if (layerCreditCost == null || layerCreditCost <= 0) {
-      layerCreditCost = 1;
-    }
   }
 
-  // Getters and setters
+  // Getters & setters
 
   public UUID getId() {
     return id;

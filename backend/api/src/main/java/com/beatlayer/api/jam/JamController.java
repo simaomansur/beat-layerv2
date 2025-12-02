@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.beatlayer.api.auth.User;
+import com.beatlayer.api.auth.UserRepository;
 import com.beatlayer.api.common.NotFoundException;
 import com.beatlayer.api.common.PageResponse;
 import com.beatlayer.api.storage.AudioStorageService;
@@ -27,10 +28,12 @@ import java.util.UUID;
 public class JamController {
 
   private final JamRepository repo;
+  private final UserRepository userRepo;
   private final AudioStorageService audioStorageService;
 
-  public JamController(JamRepository repo, AudioStorageService audioStorageService) {
+  public JamController(JamRepository repo, UserRepository userRepo, AudioStorageService audioStorageService) {
     this.repo = repo;
+    this.userRepo = userRepo;
     this.audioStorageService = audioStorageService;
   }
 
@@ -46,12 +49,25 @@ public class JamController {
 
     Jam j = new Jam();
     j.setTitle(req.title());
-    j.setMusicalKey(req.key());
+    j.setMusicalKey(req.key());              // 👈 musicalKey, JSON field is "key"
     j.setBpm(req.bpm());
     j.setGenre(req.genre());
     j.setInstrumentHint(req.instrumentHint());
-    j.setBaseAudioUrl(req.baseAudioUrl());
     j.setCreatedBy(currentUser);
+
+    // Optional premium / contest flags
+    if (req.isPremium() != null) {
+      j.setPremium(req.isPremium());
+    }
+    if (req.layerCreditCost() != null) {
+      j.setLayerCreditCost(req.layerCreditCost());
+    }
+    if (req.isContest() != null) {
+      j.setContest(req.isContest());
+    }
+    if (req.contestDescription() != null) {
+      j.setContestDescription(req.contestDescription());
+    }
 
     j = repo.save(j);
     return JamDtos.fromEntity(j);
@@ -76,8 +92,7 @@ public class JamController {
     Sort.Direction direction = sortDir.equals("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
     Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
 
-    // Start with a no-op spec instead of Specification.where(null) (deprecated)
-    Specification<Jam> spec = (root, q1, cb) -> cb.conjunction();
+    Specification<Jam> spec = Specification.where(null);
 
     if (genre != null && !genre.isBlank()) {
       String g = genre.toLowerCase();
@@ -145,9 +160,9 @@ public class JamController {
     Jam j = repo.findById(id)
         .orElseThrow(() -> new NotFoundException("Jam with id " + id + " not found"));
 
-    // Optional: enforce ownership on update
-    if (currentUser == null ||
-        j.getCreatedBy() == null ||
+    // Ownership check is optional; you can tighten this later
+    if (currentUser != null &&
+        j.getCreatedBy() != null &&
         !j.getCreatedBy().getId().equals(currentUser.getId())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your jam");
     }
@@ -167,8 +182,20 @@ public class JamController {
     if (req.instrumentHint() != null) {
       j.setInstrumentHint(req.instrumentHint());
     }
-    if (req.baseAudioUrl() != null) {
-      j.setBaseAudioUrl(req.baseAudioUrl());
+    if (req.isPremium() != null) {
+      j.setPremium(req.isPremium());
+    }
+    if (req.layerCreditCost() != null) {
+      j.setLayerCreditCost(req.layerCreditCost());
+    }
+    if (req.isContest() != null) {
+      j.setContest(req.isContest());
+    }
+    if (req.isLocked() != null) {
+      j.setLocked(req.isLocked());
+    }
+    if (req.contestDescription() != null) {
+      j.setContestDescription(req.contestDescription());
     }
 
     j = repo.save(j);
@@ -185,13 +212,13 @@ public class JamController {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
 
     // Optional: enforce ownership
-    if (currentUser == null ||
-        jam.getCreatedBy() == null ||
+    if (currentUser != null &&
+        jam.getCreatedBy() != null &&
         !jam.getCreatedBy().getId().equals(currentUser.getId())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your jam");
     }
 
-    // Delete base audio file if it exists (this still assumes local storage)
+    // Delete base audio file if it exists
     String url = jam.getBaseAudioUrl();
     if (url != null && url.startsWith("/audio/")) {
       String fileName = url.substring("/audio/".length());
@@ -207,10 +234,12 @@ public class JamController {
     return ResponseEntity.noContent().build();
   }
 
+  // Upload base layer audio for a jam
   @PostMapping("/{jamId}/layers/base")
   public ResponseEntity<?> uploadBaseLayer(
       @PathVariable UUID jamId,
-      @RequestParam("audio") MultipartFile audioFile
+      @RequestParam("audio") MultipartFile audioFile,
+      @RequestParam(name = "loopBars", required = false) Integer loopBars
   ) throws Exception {
     Jam jam = repo.findById(jamId)
         .orElseThrow(() -> new NotFoundException("Jam with id " + jamId + " not found"));
@@ -219,7 +248,6 @@ public class JamController {
       return ResponseEntity.badRequest().body("Audio file is required");
     }
 
-    // Store file and get its URL
     String audioUrl = audioStorageService.storeBaseLayerAudio(
         audioFile,
         jam.getId().toString()
@@ -227,6 +255,12 @@ public class JamController {
 
     jam.setBaseAudioUrl(audioUrl);
     repo.save(jam);
+
+    System.out.println(
+        "Stored base layer for jam " + jam.getId() +
+        " at " + audioUrl +
+        " loopBars=" + loopBars
+    );
 
     return ResponseEntity.status(HttpStatus.CREATED).build();
   }

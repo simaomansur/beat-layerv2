@@ -1,5 +1,10 @@
 package com.beatlayer.api.jam;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -8,22 +13,32 @@ public class JamDtos {
   public record JamResponse(
       UUID id,
       String title,
-      String key,            // API name stays "key"
+      String key,            // maps from Jam.musicalKey
       Integer bpm,
       String genre,
       String instrumentHint,
       String baseAudioUrl,
-      Instant createdAt,
-      Instant updatedAt
+      boolean isPremium,
+      Integer layerCreditCost,
+      boolean isContest,
+      boolean isLocked,
+      Instant createdAt
   ) {}
 
+  // This matches what your frontend already sends:
+  // title, key, bpm, genre, instrumentHint.
   public record CreateJamRequest(
-      String title,
-      String key,
-      Integer bpm,
+      @NotBlank String title,
+      @NotBlank String key,
+      @NotNull @Min(40) @Max(300) Integer bpm,
       String genre,
       String instrumentHint,
-      String baseAudioUrl
+
+      // optional extras (can be null; safe with current frontend)
+      Boolean isPremium,
+      Integer layerCreditCost,
+      Boolean isContest,
+      String contestDescription
   ) {}
 
   public record UpdateJamRequest(
@@ -32,41 +47,28 @@ public class JamDtos {
       Integer bpm,
       String genre,
       String instrumentHint,
-      String baseAudioUrl
+
+      Boolean isPremium,
+      Integer layerCreditCost,
+      Boolean isContest,
+      Boolean isLocked,
+      String contestDescription
   ) {}
 
   public static JamResponse fromEntity(Jam j) {
     return new JamResponse(
         j.getId(),
         j.getTitle(),
-        j.getMusicalKey(),      // map entity -> API
+        j.getMusicalKey(),      // 👈 map musicalKey → "key" in JSON
         j.getBpm(),
         j.getGenre(),
         j.getInstrumentHint(),
         j.getBaseAudioUrl(),
-        j.getCreatedAt(),
-        j.getUpdatedAt()
+        j.isPremium(),
+        j.getLayerCreditCost(),
+        j.isContest(),
+        j.isLocked(),
+        j.getCreatedAt()
     );
-  }
-
-  public static void applyUpdate(Jam j, UpdateJamRequest req) {
-    if (req.title() != null) {
-      j.setTitle(req.title());
-    }
-    if (req.key() != null) {
-      j.setMusicalKey(req.key());
-    }
-    if (req.bpm() != null) {
-      j.setBpm(req.bpm());
-    }
-    if (req.genre() != null) {
-      j.setGenre(req.genre());
-    }
-    if (req.instrumentHint() != null) {
-      j.setInstrumentHint(req.instrumentHint());
-    }
-    if (req.baseAudioUrl() != null) {
-      j.setBaseAudioUrl(req.baseAudioUrl());
-    }
   }
 }
