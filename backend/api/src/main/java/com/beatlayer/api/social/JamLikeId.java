@@ -1,55 +1,49 @@
 package com.beatlayer.api.social;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Embeddable;
-
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
 
-@Embeddable
 public class JamLikeId implements Serializable {
 
-  @Column(name = "jam_id", nullable = false)
-  private UUID jamId;
-
-  @Column(name = "user_id", nullable = false)
-  private UUID userId;
+  private UUID jam;
+  private UUID user;
 
   public JamLikeId() {
   }
 
-  public JamLikeId(UUID jamId, UUID userId) {
-    this.jamId = jamId;
-    this.userId = userId;
+  public JamLikeId(UUID jam, UUID user) {
+    this.jam = jam;
+    this.user = user;
   }
 
-  public UUID getJamId() {
-    return jamId;
+  public UUID getJam() {
+    return jam;
   }
 
-  public void setJamId(UUID jamId) {
-    this.jamId = jamId;
+  public void setJam(UUID jam) {
+    this.jam = jam;
   }
 
-  public UUID getUserId() {
-    return userId;
+  public UUID getUser() {
+    return user;
   }
 
-  public void setUserId(UUID userId) {
-    this.userId = userId;
+  public void setUser(UUID user) {
+    this.user = user;
   }
 
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof JamLikeId that)) return false;
-    return Objects.equals(jamId, that.jamId)
-        && Objects.equals(userId, that.userId);
+    if (o == null || getClass() != o.getClass()) return false;
+    JamLikeId jamLikeId = (JamLikeId) o;
+    return Objects.equals(jam, jamLikeId.jam)
+        && Objects.equals(user, jamLikeId.user);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(jamId, userId);
+    return Objects.hash(jam, user);
   }
 }

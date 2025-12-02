@@ -5,6 +5,8 @@ import com.beatlayer.api.jam.Jam;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -12,14 +14,15 @@ import java.util.UUID;
 public class JamComment {
 
   @Id
-  @Column(nullable = false, updatable = false)
+  @GeneratedValue
+  @Column(name = "id", nullable = false, updatable = false)
   private UUID id;
 
-  @ManyToOne(fetch = FetchType.LAZY)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "jam_id", nullable = false)
   private Jam jam;
 
-  @ManyToOne(fetch = FetchType.LAZY)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "user_id", nullable = false)
   private User user;
 
@@ -27,36 +30,31 @@ public class JamComment {
   @JoinColumn(name = "parent_comment_id")
   private JamComment parentComment;
 
-  @Column(nullable = false)
+  @OneToMany(mappedBy = "parentComment", cascade = CascadeType.ALL, orphanRemoval = false)
+  private List<JamComment> replies = new ArrayList<>();
+
+  @Column(name = "body", nullable = false, columnDefinition = "text")
   private String body;
 
-  @Column(name = "created_at", nullable = false, updatable = false)
+  @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
   @PrePersist
-  public void prePersist() {
+  void onCreate() {
     Instant now = Instant.now();
-
-    if (id == null) {
-      id = UUID.randomUUID();
-    }
-    if (createdAt == null) {
-      createdAt = now;
-    }
-    if (updatedAt == null) {
-      updatedAt = now;
-    }
+    this.createdAt = now;
+    this.updatedAt = now;
   }
 
   @PreUpdate
-  public void preUpdate() {
-    updatedAt = Instant.now();
+  void onUpdate() {
+    this.updatedAt = Instant.now();
   }
 
-  // Getters and setters
+  // getters and setters
 
   public UUID getId() {
     return id;
@@ -88,6 +86,14 @@ public class JamComment {
 
   public void setParentComment(JamComment parentComment) {
     this.parentComment = parentComment;
+  }
+
+  public List<JamComment> getReplies() {
+    return replies;
+  }
+
+  public void setReplies(List<JamComment> replies) {
+    this.replies = replies;
   }
 
   public String getBody() {

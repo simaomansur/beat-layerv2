@@ -4,9 +4,9 @@ import com.beatlayer.api.auth.User;
 import com.beatlayer.api.jam.Jam;
 import jakarta.persistence.*;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "layers")
@@ -43,10 +43,10 @@ public class Layer {
   @Column(name = "start_offset_ms", nullable = false)
   private Integer startOffsetMs = 0;
 
-  @Column(name = "gain_db", nullable = false, precision = 5, scale = 2)
+  @Column(name = "gain_db", nullable = false)
   private BigDecimal gainDb = BigDecimal.ZERO;
 
-  @Column(nullable = false, precision = 4, scale = 3)
+  @Column(nullable = false)
   private BigDecimal pan = BigDecimal.ZERO;
 
   @Column(name = "key_override")
@@ -58,27 +58,19 @@ public class Layer {
   @Column
   private String instrument;
 
-  @Column
+  @Column(columnDefinition = "text")
   private String notes;
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
-  @Column(name = "updated_at", nullable = false)
-  private Instant updatedAt;
-
   @PrePersist
   public void prePersist() {
-    Instant now = Instant.now();
-
     if (id == null) {
       id = UUID.randomUUID();
     }
     if (createdAt == null) {
-      createdAt = now;
-    }
-    if (updatedAt == null) {
-      updatedAt = now;
+      createdAt = Instant.now();
     }
     if (startOffsetMs == null) {
       startOffsetMs = 0;
@@ -91,21 +83,7 @@ public class Layer {
     }
   }
 
-  @PreUpdate
-  public void preUpdate() {
-    updatedAt = Instant.now();
-    if (startOffsetMs == null) {
-      startOffsetMs = 0;
-    }
-    if (gainDb == null) {
-      gainDb = BigDecimal.ZERO;
-    }
-    if (pan == null) {
-      pan = BigDecimal.ZERO;
-    }
-  }
-
-  // Getters and setters
+  // --- getters & setters ---
 
   public UUID getId() {
     return id;
@@ -233,13 +211,5 @@ public class Layer {
 
   public void setCreatedAt(Instant createdAt) {
     this.createdAt = createdAt;
-  }
-
-  public Instant getUpdatedAt() {
-    return updatedAt;
-  }
-
-  public void setUpdatedAt(Instant updatedAt) {
-    this.updatedAt = updatedAt;
   }
 }

@@ -1,19 +1,12 @@
 package com.beatlayer.api.social;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Embeddable;
-
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
 
-@Embeddable
 public class LayerVoteId implements Serializable {
 
-  @Column(name = "layer_id", nullable = false)
   private UUID layerId;
-
-  @Column(name = "user_id", nullable = false)
   private UUID userId;
 
   public LayerVoteId() {
@@ -43,7 +36,8 @@ public class LayerVoteId implements Serializable {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof LayerVoteId that)) return false;
+    if (o == null || getClass() != o.getClass()) return false;
+    LayerVoteId that = (LayerVoteId) o;
     return Objects.equals(layerId, that.layerId)
         && Objects.equals(userId, that.userId);
   }

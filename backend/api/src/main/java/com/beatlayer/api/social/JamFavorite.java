@@ -7,7 +7,12 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "jam_favorites")
+@Table(
+    name = "jam_favorites",
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"jam_id", "user_id"})
+    }
+)
 public class JamFavorite {
 
   @EmbeddedId
@@ -23,7 +28,8 @@ public class JamFavorite {
   @JoinColumn(name = "user_id", nullable = false)
   private User user;
 
-  @Column(name = "created_at", nullable = false, updatable = false)
+  // DB default now(), so we just read it
+  @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
   private Instant createdAt;
 
   public JamFavorite() {
@@ -32,26 +38,7 @@ public class JamFavorite {
   public JamFavorite(Jam jam, User user) {
     this.jam = jam;
     this.user = user;
-    this.id = new JamFavoriteId(
-        jam != null ? jam.getId() : null,
-        user != null ? user.getId() : null
-    );
-  }
-
-  @PrePersist
-  public void prePersist() {
-    if (createdAt == null) {
-      createdAt = Instant.now();
-    }
-    if (id == null) {
-      id = new JamFavoriteId();
-    }
-    if (jam != null && id.getJamId() == null) {
-      id.setJamId(jam.getId());
-    }
-    if (user != null && id.getUserId() == null) {
-      id.setUserId(user.getId());
-    }
+    this.id = new JamFavoriteId(jam.getId(), user.getId());
   }
 
   public JamFavoriteId getId() {
@@ -68,12 +55,6 @@ public class JamFavorite {
 
   public void setJam(Jam jam) {
     this.jam = jam;
-    if (this.id == null) {
-      this.id = new JamFavoriteId();
-    }
-    if (jam != null) {
-      this.id.setJamId(jam.getId());
-    }
   }
 
   public User getUser() {
@@ -82,12 +63,6 @@ public class JamFavorite {
 
   public void setUser(User user) {
     this.user = user;
-    if (this.id == null) {
-      this.id = new JamFavoriteId();
-    }
-    if (user != null) {
-      this.id.setUserId(user.getId());
-    }
   }
 
   public Instant getCreatedAt() {

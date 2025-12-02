@@ -43,9 +43,10 @@ public class JamFavoriteId implements Serializable {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof JamFavoriteId that)) return false;
-    return Objects.equals(jamId, that.jamId)
-        && Objects.equals(userId, that.userId);
+    if (o == null || getClass() != o.getClass()) return false;
+    JamFavoriteId that = (JamFavoriteId) o;
+    return Objects.equals(jamId, that.jamId) &&
+           Objects.equals(userId, that.userId);
   }
 
   @Override

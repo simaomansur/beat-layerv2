@@ -5,63 +5,53 @@ import com.beatlayer.api.layer.Layer;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "layer_votes")
+@IdClass(LayerVoteId.class)
 public class LayerVote {
 
-  @EmbeddedId
-  private LayerVoteId id;
+  @Id
+  @Column(name = "layer_id", nullable = false)
+  private UUID layerId;
+
+  @Id
+  @Column(name = "user_id", nullable = false)
+  private UUID userId;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @MapsId("layerId")
-  @JoinColumn(name = "layer_id", nullable = false)
+  @JoinColumn(name = "layer_id", insertable = false, updatable = false)
   private Layer layer;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @MapsId("userId")
-  @JoinColumn(name = "user_id", nullable = false)
+  @JoinColumn(name = "user_id", insertable = false, updatable = false)
   private User user;
 
-  @Column(name = "created_at", nullable = false, updatable = false)
+  @Column(name = "created_at", nullable = false)
   private Instant createdAt;
-
-  public LayerVote() {
-  }
-
-  public LayerVote(Layer layer, User user) {
-    this.layer = layer;
-    this.user = user;
-    this.id = new LayerVoteId(
-        layer != null ? layer.getId() : null,
-        user != null ? user.getId() : null
-    );
-  }
 
   @PrePersist
   public void prePersist() {
     if (createdAt == null) {
       createdAt = Instant.now();
     }
-    if (id == null) {
-      id = new LayerVoteId();
-    }
-    if (layer != null && id.getLayerId() == null) {
-      id.setLayerId(layer.getId());
-    }
-    if (user != null && id.getUserId() == null) {
-      id.setUserId(user.getId());
-    }
   }
 
-  // getters & setters
-
-  public LayerVoteId getId() {
-    return id;
+  public UUID getLayerId() {
+    return layerId;
   }
 
-  public void setId(LayerVoteId id) {
-    this.id = id;
+  public void setLayerId(UUID layerId) {
+    this.layerId = layerId;
+  }
+
+  public UUID getUserId() {
+    return userId;
+  }
+
+  public void setUserId(UUID userId) {
+    this.userId = userId;
   }
 
   public Layer getLayer() {
@@ -70,12 +60,6 @@ public class LayerVote {
 
   public void setLayer(Layer layer) {
     this.layer = layer;
-    if (this.id == null) {
-      this.id = new LayerVoteId();
-    }
-    if (layer != null) {
-      this.id.setLayerId(layer.getId());
-    }
   }
 
   public User getUser() {
@@ -84,12 +68,6 @@ public class LayerVote {
 
   public void setUser(User user) {
     this.user = user;
-    if (this.id == null) {
-      this.id = new LayerVoteId();
-    }
-    if (user != null) {
-      this.id.setUserId(user.getId());
-    }
   }
 
   public Instant getCreatedAt() {
