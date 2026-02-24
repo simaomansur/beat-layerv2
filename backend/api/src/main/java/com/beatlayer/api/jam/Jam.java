@@ -1,217 +1,170 @@
 package com.beatlayer.api.jam;
 
-import com.beatlayer.api.auth.User;
+import com.beatlayer.api.user.User;
+import com.beatlayer.api.thread.ThreadItem;
 import jakarta.persistence.*;
 
-import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "jams")
 public class Jam {
 
-  @Id
-  @Column(nullable = false, updatable = false)
-  private UUID id;
+    @Id
+    @GeneratedValue
+    private UUID id;
 
-  @Column(nullable = false, length = 255)
-  private String title;
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_user_id", nullable = false)
+    private User createdBy;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "created_by", nullable = false)
-  private User createdBy;
+    @Column(nullable = false, length = 255)
+    private String title;
 
-  // maps to musical_key
-  @Column(name = "musical_key", nullable = false)
-  private String musicalKey;
+    @Column(columnDefinition = "text")
+    private String description;
 
-  @Column(nullable = false)
-  private Integer bpm;
+    @Column(name = "loop_length_ms", nullable = false)
+    private Integer loopLengthMs;
 
-  @Column
-  private String genre;
+    @Column
+    private Integer bpm;
 
-  @Column(name = "instrument_hint")
-  private String instrumentHint;
+    @Column(name = "musical_key")
+    private String musicalKey;
 
-  @Column(name = "base_audio_url")
-  private String baseAudioUrl;
+    @Column
+    private String genre;
 
-  // Premium + credits
-  @Column(name = "is_premium", nullable = false)
-  private boolean premium = false;
+    @Column(name = "instrument_hint")
+    private String instrumentHint;
 
-  @Column(name = "layer_credit_cost", nullable = false)
-  private Integer layerCreditCost = 1;
+    @Column(nullable = false)
+    private String visibility = "public";
 
-  // Contest fields
-  @Column(name = "is_contest", nullable = false)
-  private boolean contest = false;
+    // Nullable during creation; backend will set after root is created.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "root_item_id")
+    private ThreadItem rootItem;
 
-  @Column(name = "contest_ends_at")
-  private Instant contestEndsAt;
+    @Column(name = "created_at", nullable = false)
+    private OffsetDateTime createdAt;
 
-  @Column(name = "contest_description")
-  private String contestDescription;
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
 
-  @Column(name = "is_locked", nullable = false)
-  private boolean locked = false;
-
-  @Column(name = "created_at", nullable = false)
-  private Instant createdAt;
-
-  @Column(name = "updated_at", nullable = false)
-  private Instant updatedAt;
-
-  @PrePersist
-  public void prePersist() {
-    if (id == null) {
-      id = UUID.randomUUID();
+    protected Jam() {
+        // JPA
     }
-    Instant now = Instant.now();
-    if (createdAt == null) {
-      createdAt = now;
+
+    public Jam(User createdBy, String title, Integer loopLengthMs) {
+        this.createdBy = createdBy;
+        this.title = title;
+        this.loopLengthMs = loopLengthMs;
     }
-    if (updatedAt == null) {
-      updatedAt = now;
+
+    @PrePersist
+    void onCreate() {
+        OffsetDateTime now = OffsetDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
     }
-    if (layerCreditCost == null) {
-      layerCreditCost = 1;
+
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = OffsetDateTime.now();
     }
-  }
 
-  @PreUpdate
-  public void preUpdate() {
-    updatedAt = Instant.now();
-  }
+    public UUID getId() {
+        return id;
+    }
 
-  // Getters & setters
+    public User getCreatedBy() {
+        return createdBy;
+    }
 
-  public UUID getId() {
-    return id;
-  }
+    public String getTitle() {
+        return title;
+    }
 
-  public void setId(UUID id) {
-    this.id = id;
-  }
+    public String getDescription() {
+        return description;
+    }
 
-  public String getTitle() {
-    return title;
-  }
+    public Integer getLoopLengthMs() {
+        return loopLengthMs;
+    }
 
-  public void setTitle(String title) {
-    this.title = title;
-  }
+    public Integer getBpm() {
+        return bpm;
+    }
 
-  public User getCreatedBy() {
-    return createdBy;
-  }
+    public String getMusicalKey() {
+        return musicalKey;
+    }
 
-  public void setCreatedBy(User createdBy) {
-    this.createdBy = createdBy;
-  }
+    public String getGenre() {
+        return genre;
+    }
 
-  public String getMusicalKey() {
-    return musicalKey;
-  }
+    public String getInstrumentHint() {
+        return instrumentHint;
+    }
 
-  public void setMusicalKey(String musicalKey) {
-    this.musicalKey = musicalKey;
-  }
+    public String getVisibility() {
+        return visibility;
+    }
 
-  public Integer getBpm() {
-    return bpm;
-  }
+    public ThreadItem getRootItem() {
+        return rootItem;
+    }
 
-  public void setBpm(Integer bpm) {
-    this.bpm = bpm;
-  }
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
 
-  public String getGenre() {
-    return genre;
-  }
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
 
-  public void setGenre(String genre) {
-    this.genre = genre;
-  }
+    public void setCreatedBy(User createdBy) {
+        this.createdBy = createdBy;
+    }
 
-  public String getInstrumentHint() {
-    return instrumentHint;
-  }
+    public void setTitle(String title) {
+        this.title = title;
+    }
 
-  public void setInstrumentHint(String instrumentHint) {
-    this.instrumentHint = instrumentHint;
-  }
+    public void setDescription(String description) {
+        this.description = description;
+    }
 
-  public String getBaseAudioUrl() {
-    return baseAudioUrl;
-  }
+    public void setLoopLengthMs(Integer loopLengthMs) {
+        this.loopLengthMs = loopLengthMs;
+    }
 
-  public void setBaseAudioUrl(String baseAudioUrl) {
-    this.baseAudioUrl = baseAudioUrl;
-  }
+    public void setBpm(Integer bpm) {
+        this.bpm = bpm;
+    }
 
-  public boolean isPremium() {
-    return premium;
-  }
+    public void setMusicalKey(String musicalKey) {
+        this.musicalKey = musicalKey;
+    }
 
-  public void setPremium(boolean premium) {
-    this.premium = premium;
-  }
+    public void setGenre(String genre) {
+        this.genre = genre;
+    }
 
-  public Integer getLayerCreditCost() {
-    return layerCreditCost;
-  }
+    public void setInstrumentHint(String instrumentHint) {
+        this.instrumentHint = instrumentHint;
+    }
 
-  public void setLayerCreditCost(Integer layerCreditCost) {
-    this.layerCreditCost = layerCreditCost;
-  }
+    public void setVisibility(String visibility) {
+        this.visibility = visibility;
+    }
 
-  public boolean isContest() {
-    return contest;
-  }
-
-  public void setContest(boolean contest) {
-    this.contest = contest;
-  }
-
-  public Instant getContestEndsAt() {
-    return contestEndsAt;
-  }
-
-  public void setContestEndsAt(Instant contestEndsAt) {
-    this.contestEndsAt = contestEndsAt;
-  }
-
-  public String getContestDescription() {
-    return contestDescription;
-  }
-
-  public void setContestDescription(String contestDescription) {
-    this.contestDescription = contestDescription;
-  }
-
-  public boolean isLocked() {
-    return locked;
-  }
-
-  public void setLocked(boolean locked) {
-    this.locked = locked;
-  }
-
-  public Instant getCreatedAt() {
-    return createdAt;
-  }
-
-  public void setCreatedAt(Instant createdAt) {
-    this.createdAt = createdAt;
-  }
-
-  public Instant getUpdatedAt() {
-    return updatedAt;
-  }
-
-  public void setUpdatedAt(Instant updatedAt) {
-    this.updatedAt = updatedAt;
-  }
+    public void setRootItem(ThreadItem rootItem) {
+        this.rootItem = rootItem;
+    }
 }

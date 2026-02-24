@@ -1,337 +1,181 @@
 -- =====================================
--- Extensions
+-- Beat Layer v1: Minimal Core Schema
+-- - Unified Reddit-style thread items (AUDIO or COMMENT)
+-- - Audio assets stored separately
+-- - Audio item details stored separately (non-destructive edits + mix)
+-- - Minimal constraints; business rules enforced in backend
 -- =====================================
-create extension if not exists "uuid-ossp";
+
+-- UUID support
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- =====================================
 -- USERS
 -- =====================================
-create table if not exists users (
-  id uuid primary key default uuid_generate_v4(),
-  handle varchar(50) unique not null,
-  email varchar(255) unique not null,
-  password_hash text not null,
-
-  -- 'user'  = normal user
-  -- 'creator' = can create premium or contest jams (with subscription later)
-  -- 'admin' = full powers
-  role text not null default 'user' check (role in ('user', 'creator', 'admin')),
-
-  -- Stripe mapping
-  stripe_customer_id text unique,
-
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
--- Optional seed admin. Replace email and password_hash in real life.
-insert into users (id, handle, email, password_hash, role)
-values (
-  '00000000-0000-0000-0000-000000000001',
-  'admin',
-  'admin@example.com',
-  '$2a$10$replace_this_with_real_bcrypt_hash',
-  'admin'
-)
-on conflict (email) do nothing;
-
--- =====================================
--- USER CREDIT BALANCES
--- =====================================
-create table if not exists user_credit_balances (
-  user_id uuid primary key references users(id) on delete cascade,
-  balance int not null default 0 check (balance >= 0)
+CREATE TABLE IF NOT EXISTS users (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  handle      VARCHAR(50) UNIQUE NOT NULL,
+  email       VARCHAR(255) UNIQUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- =====================================
 -- JAMS
+-- root_item_id is added after thread_items exists.
+-- loop_length_ms is canonical for MVP (simple for looping).
 -- =====================================
-create table if not exists jams (
-  id uuid primary key default uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS jams (
+  id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
-  title varchar(255) not null,
-  created_by uuid not null references users(id) on delete cascade,
+  title              VARCHAR(255) NOT NULL,
+  description        TEXT,
 
-  musical_key text not null,      -- for example "C#m", "D Dorian"
-  bpm int not null check (bpm between 40 and 300),
+  loop_length_ms     INT NOT NULL CHECK (loop_length_ms > 0),
 
-  genre text,
-  instrument_hint text,
-  base_audio_url text,            -- main or base mix URL
+  -- Optional musical metadata (helpful for browsing/UI)
+  bpm                INT CHECK (bpm BETWEEN 40 AND 300),
+  musical_key        TEXT,
+  genre              TEXT,
+  instrument_hint    TEXT,
 
-  -- Premium and credits
-  is_premium boolean not null default false,
-  layer_credit_cost int not null default 1 check (layer_credit_cost > 0),
+  visibility         TEXT NOT NULL DEFAULT 'public'
+                     CHECK (visibility IN ('public','unlisted','private')),
 
-  -- Contest
-  is_contest boolean not null default false,
-  contest_ends_at timestamptz,
-  contest_description text,
-  is_locked boolean not null default false,  -- true when contest done or jam read only
-
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-create index if not exists idx_jams_created_by_created_at
-  on jams(created_by, created_at desc);
+CREATE INDEX IF NOT EXISTS idx_jams_visibility_created_at
+  ON jams(visibility, created_at DESC);
 
-create index if not exists idx_jams_created_at
-  on jams(created_at desc);
-
-create index if not exists idx_jams_contest_flags
-  on jams(is_contest, is_locked, contest_ends_at);
+CREATE INDEX IF NOT EXISTS idx_jams_created_by_created_at
+  ON jams(created_by_user_id, created_at DESC);
 
 -- =====================================
--- TAGS
+-- THREAD ITEMS (Unified tree: AUDIO + COMMENT)
+-- This is the "Reddit-like" structure.
+-- Backend enforces:
+-- - root must be AUDIO
+-- - parent must be in same jam
+-- - playback path logic (audio-only ancestors)
+-- DB enforces:
+-- - basic type validity
+-- - comment body required when COMMENT
+-- - 1 root per jam (parent_item_id IS NULL)
 -- =====================================
-create table if not exists tags (
-  id uuid primary key default uuid_generate_v4(),
-  name varchar(64) not null unique
+CREATE TABLE IF NOT EXISTS thread_items (
+  id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  jam_id             UUID NOT NULL REFERENCES jams(id) ON DELETE CASCADE,
+  parent_item_id     UUID REFERENCES thread_items(id) ON DELETE SET NULL,
+
+  created_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  item_type          TEXT NOT NULL CHECK (item_type IN ('AUDIO','COMMENT')),
+  body               TEXT, -- used for COMMENT; can be NULL for AUDIO
+
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT chk_comment_body_required
+    CHECK (
+      (item_type = 'COMMENT' AND body IS NOT NULL AND length(trim(body)) > 0)
+      OR
+      (item_type = 'AUDIO')
+    )
 );
 
-create table if not exists jam_tags (
-  jam_id uuid not null references jams(id) on delete cascade,
-  tag_id uuid not null references tags(id) on delete cascade,
-  primary key (jam_id, tag_id)
+CREATE INDEX IF NOT EXISTS idx_thread_items_jam_created_at
+  ON thread_items(jam_id, created_at ASC);
+
+CREATE INDEX IF NOT EXISTS idx_thread_items_parent
+  ON thread_items(parent_item_id);
+
+-- Enforce: only ONE root item per jam (the item with parent_item_id IS NULL)
+CREATE UNIQUE INDEX IF NOT EXISTS ux_thread_items_one_root_per_jam
+  ON thread_items(jam_id)
+  WHERE parent_item_id IS NULL;
+
+-- Now that thread_items exists, add jams.root_item_id (nullable during creation flow)
+ALTER TABLE jams
+  ADD COLUMN IF NOT EXISTS root_item_id UUID;
+
+ALTER TABLE jams
+  ADD CONSTRAINT fk_jams_root_item
+  FOREIGN KEY (root_item_id) REFERENCES thread_items(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_jams_root_item
+  ON jams(root_item_id);
+
+-- =====================================
+-- AUDIO ASSETS (Recorded file metadata)
+-- storage_locator can be local path in dev or cloud key/url in prod.
+-- =====================================
+CREATE TABLE IF NOT EXISTS audio_assets (
+  id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  storage_locator    TEXT NOT NULL,      -- e.g. /files/abc.wav OR s3://bucket/key OR blob URL
+  mime_type          TEXT NOT NULL,      -- audio/wav, audio/mpeg, etc.
+  duration_ms        INT NOT NULL CHECK (duration_ms > 0),
+
+  sample_rate        INT,
+  channels           INT CHECK (channels IS NULL OR channels IN (1,2)),
+  bytes              BIGINT CHECK (bytes IS NULL OR bytes >= 0),
+
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-create index if not exists idx_jam_tags_tag
-  on jam_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_audio_assets_created_by_created_at
+  ON audio_assets(created_by_user_id, created_at DESC);
 
 -- =====================================
--- LAYERS
+-- AUDIO ITEM DETAILS (1:1 with an AUDIO thread_item)
+-- DB does NOT enforce that thread_item is AUDIO; backend enforces it.
 -- =====================================
-create table if not exists layers (
-  id uuid primary key default uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS audio_item_details (
+  thread_item_id     UUID PRIMARY KEY REFERENCES thread_items(id) ON DELETE CASCADE,
+  audio_asset_id     UUID NOT NULL REFERENCES audio_assets(id) ON DELETE RESTRICT,
 
-  jam_id uuid not null references jams(id) on delete cascade,
-  parent_layer_id uuid references layers(id) on delete set null,
-  created_by uuid not null references users(id) on delete cascade,
+  -- Loop-aligned by default; allow shifting within loop if desired
+  start_offset_ms    INT NOT NULL DEFAULT 0 CHECK (start_offset_ms >= 0),
 
-  s3_key_original text not null,
-  s3_key_normalized text,
+  -- Non-destructive trim inside the asset
+  trim_start_ms      INT NOT NULL DEFAULT 0 CHECK (trim_start_ms >= 0),
+  trim_end_ms        INT CHECK (trim_end_ms IS NULL OR trim_end_ms > trim_start_ms),
 
-  duration_ms int not null check (duration_ms > 0),
-  bars int not null check (bars > 0),
-  start_offset_ms int not null default 0,
+  -- Mix controls
+  gain_db            NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (gain_db BETWEEN -60 AND 12),
+  pan                NUMERIC(4,3) NOT NULL DEFAULT 0 CHECK (pan BETWEEN -1 AND 1),
+  muted              BOOLEAN NOT NULL DEFAULT FALSE,
 
-  gain_db numeric(5,2) not null default 0 check (gain_db between -60 and 12),
-  pan numeric(4,3) not null default 0 check (pan between -1 and 1),
+  instrument         TEXT,
+  notes              TEXT,
 
-  key_override text,
-  bpm_override int check (bpm_override between 40 and 300),
-
-  instrument text,
-  notes text,
-
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-create index if not exists idx_layers_jam_parent
-  on layers(jam_id, parent_layer_id);
-
-create index if not exists idx_layers_jam_created_at
-  on layers(jam_id, created_at asc);
-
-create index if not exists idx_layers_created_by_created_at
-  on layers(created_by, created_at desc);
+CREATE INDEX IF NOT EXISTS idx_audio_item_details_audio_asset
+  ON audio_item_details(audio_asset_id);
 
 -- =====================================
--- COMMENTS ON JAMS
+-- REACTIONS (optional, simple "like")
+-- Works great for UI polish; backend can expand types later.
 -- =====================================
-create table if not exists jam_comments (
-  id uuid primary key default uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS reactions (
+  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id              UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  target_thread_item_id UUID NOT NULL REFERENCES thread_items(id) ON DELETE CASCADE,
+  reaction_type        TEXT NOT NULL DEFAULT 'LIKE' CHECK (reaction_type IN ('LIKE')),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-  jam_id uuid not null references jams(id) on delete cascade,
-  user_id uuid not null references users(id) on delete cascade,
-  parent_comment_id uuid references jam_comments(id) on delete set null,
-
-  body text not null,
-
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  UNIQUE (user_id, target_thread_item_id, reaction_type)
 );
 
-create index if not exists idx_jam_comments_jam_created_at
-  on jam_comments(jam_id, created_at asc);
+CREATE INDEX IF NOT EXISTS idx_reactions_target_created_at
+  ON reactions(target_thread_item_id, created_at DESC);
 
-create index if not exists idx_jam_comments_user_created_at
-  on jam_comments(user_id, created_at desc);
-
--- =====================================
--- LIKES AND FAVORITES FOR JAMS
--- =====================================
-create table if not exists jam_likes (
-  jam_id uuid not null references jams(id) on delete cascade,
-  user_id uuid not null references users(id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (jam_id, user_id)
-);
-
-create index if not exists idx_jam_likes_user_created_at
-  on jam_likes(user_id, created_at desc);
-
-create table if not exists jam_favorites (
-  jam_id uuid not null references jams(id) on delete cascade,
-  user_id uuid not null references users(id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (jam_id, user_id)
-);
-
-create index if not exists idx_jam_favorites_user_created_at
-  on jam_favorites(user_id, created_at desc);
-
--- =====================================
--- LAYER VOTES FOR CONTESTS
--- =====================================
-create table if not exists layer_votes (
-  layer_id uuid not null references layers(id) on delete cascade,
-  user_id uuid not null references users(id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (layer_id, user_id)
-);
-
-create index if not exists idx_layer_votes_layer
-  on layer_votes(layer_id);
-
-create index if not exists idx_layer_votes_user
-  on layer_votes(user_id);
-
--- =====================================
--- CONTEST WINNERS AND TROPHIES
--- =====================================
-create table if not exists jam_contest_winners (
-  jam_id uuid not null references jams(id) on delete cascade,
-  user_id uuid not null references users(id) on delete cascade,
-
-  -- 1 = gold, 2 = silver, 3 = bronze
-  place int not null check (place between 1 and 3),
-
-  awarded_at timestamptz not null default now(),
-
-  primary key (jam_id, user_id)
-);
-
-create index if not exists idx_jam_contest_winners_user
-  on jam_contest_winners(user_id);
-
-create index if not exists idx_jam_contest_winners_jam
-  on jam_contest_winners(jam_id);
-
--- =====================================
--- CREDIT TRANSACTIONS
--- =====================================
-create table if not exists credit_transactions (
-  id uuid primary key default uuid_generate_v4(),
-
-  user_id uuid not null references users(id) on delete cascade,
-
-  -- positive = earn, negative = spend
-  amount int not null check (amount <> 0),
-  transaction_type text not null check (transaction_type in ('earn', 'spend', 'adjust')),
-
-  jam_id uuid references jams(id) on delete set null,
-  layer_id uuid references layers(id) on delete set null,
-
-  description text,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists idx_credit_transactions_user_created_at
-  on credit_transactions(user_id, created_at desc);
-
--- =====================================
--- STRIPE: CREDIT PACKAGES AND CREATOR PLANS
--- =====================================
-create table if not exists credit_packages (
-  id uuid primary key default uuid_generate_v4(),
-  code text not null unique,          -- for example 'credits_small'
-  name text not null,                 -- for example '50 Credits Pack'
-  credits_amount int not null check (credits_amount > 0),
-  stripe_price_id text not null,      -- price_XXXX
-  active boolean not null default true
-);
-
-create table if not exists creator_plans (
-  id uuid primary key default uuid_generate_v4(),
-  code text not null unique,          -- for example 'creator_monthly'
-  name text not null,                 -- for example 'Beat Layer Creator Monthly'
-  stripe_price_id text not null,      -- recurring price_XXXX
-  active boolean not null default true
-);
-
-create table if not exists creator_subscriptions (
-  id uuid primary key default uuid_generate_v4(),
-
-  user_id uuid not null references users(id) on delete cascade,
-  plan_id uuid not null references creator_plans(id) on delete restrict,
-
-  stripe_subscription_id text not null,      -- sub_XXXX
-  status text not null,                      -- for example 'active', 'canceled'
-  current_period_end timestamptz,
-
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create index if not exists idx_creator_subscriptions_user
-  on creator_subscriptions(user_id, created_at desc);
-
--- Optional Stripe payment log
-create table if not exists stripe_payments (
-  id uuid primary key default uuid_generate_v4(),
-
-  user_id uuid not null references users(id) on delete cascade,
-
-  stripe_payment_intent_id text,
-  stripe_invoice_id text,
-  stripe_checkout_session_id text,
-
-  amount_total int,
-  currency text,
-  purpose text not null,    -- for example 'credits' or 'creator_subscription'
-
-  raw_data jsonb,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists idx_stripe_payments_user
-  on stripe_payments(user_id, created_at desc);
-
--- =====================================
--- UPDATED_AT TRIGGER
--- =====================================
-create or replace function set_updated_at()
-returns trigger as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$ language plpgsql;
-
-create trigger trg_users_set_updated_at
-  before update on users
-  for each row
-  execute function set_updated_at();
-
-create trigger trg_jams_set_updated_at
-  before update on jams
-  for each row
-  execute function set_updated_at();
-
-create trigger trg_layers_set_updated_at
-  before update on layers
-  for each row
-  execute function set_updated_at();
-
-create trigger trg_jam_comments_set_updated_at
-  before update on jam_comments
-  for each row
-  execute function set_updated_at();
-
-create trigger trg_creator_subscriptions_set_updated_at
-  before update on creator_subscriptions
-  for each row
-  execute function set_updated_at();
+CREATE INDEX IF NOT EXISTS idx_reactions_user_created_at
+  ON reactions(user_id, created_at DESC);

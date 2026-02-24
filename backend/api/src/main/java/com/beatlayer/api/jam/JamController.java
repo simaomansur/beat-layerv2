@@ -1,267 +1,58 @@
 package com.beatlayer.api.jam;
 
-import jakarta.validation.Valid;
-import org.springframework.data.domain.*;
-import org.springframework.data.jpa.domain.Specification;
+import com.beatlayer.api.user.User;
+import com.beatlayer.api.user.UserRepository;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
-import com.beatlayer.api.auth.User;
-import com.beatlayer.api.auth.UserRepository;
-import com.beatlayer.api.common.NotFoundException;
-import com.beatlayer.api.common.PageResponse;
-import com.beatlayer.api.storage.AudioStorageService;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/jams")
-@CrossOrigin(origins = "http://localhost:5173")
 public class JamController {
 
-  private final JamRepository repo;
-  private final UserRepository userRepo;
-  private final AudioStorageService audioStorageService;
+    private final JamRepository jams;
+    private final UserRepository users;
 
-  public JamController(JamRepository repo, UserRepository userRepo, AudioStorageService audioStorageService) {
-    this.repo = repo;
-    this.userRepo = userRepo;
-    this.audioStorageService = audioStorageService;
-  }
-
-  // Create a jam
-  @PostMapping
-  public JamDtos.JamResponse create(
-      @Valid @RequestBody JamDtos.CreateJamRequest req,
-      @AuthenticationPrincipal User currentUser
-  ) {
-    if (currentUser == null) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Login required");
+    public JamController(JamRepository jams, UserRepository users) {
+        this.jams = jams;
+        this.users = users;
     }
 
-    Jam j = new Jam();
-    j.setTitle(req.title());
-    j.setMusicalKey(req.key());              // 👈 musicalKey, JSON field is "key"
-    j.setBpm(req.bpm());
-    j.setGenre(req.genre());
-    j.setInstrumentHint(req.instrumentHint());
-    j.setCreatedBy(currentUser);
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public JamResponse create(@RequestBody CreateJamRequest req) {
+        if (req == null) throw new IllegalArgumentException("body is required");
+        if (req.createdByUserId() == null) throw new IllegalArgumentException("createdByUserId is required");
+        if (req.title() == null || req.title().isBlank()) throw new IllegalArgumentException("title is required");
+        if (req.loopLengthMs() == null || req.loopLengthMs() <= 0) throw new IllegalArgumentException("loopLengthMs must be > 0");
 
-    // Optional premium / contest flags
-    if (req.isPremium() != null) {
-      j.setPremium(req.isPremium());
-    }
-    if (req.layerCreditCost() != null) {
-      j.setLayerCreditCost(req.layerCreditCost());
-    }
-    if (req.isContest() != null) {
-      j.setContest(req.isContest());
-    }
-    if (req.contestDescription() != null) {
-      j.setContestDescription(req.contestDescription());
-    }
+        User creator = users.findById(req.createdByUserId())
+                .orElseThrow(() -> new IllegalArgumentException("createdByUserId not found: " + req.createdByUserId()));
 
-    j = repo.save(j);
-    return JamDtos.fromEntity(j);
-  }
+        Jam jam = new Jam(creator, req.title().trim(), req.loopLengthMs());
+        jam.setDescription(req.description());
+        jam.setBpm(req.bpm());
+        jam.setMusicalKey(req.musicalKey());
+        jam.setGenre(req.genre());
+        jam.setInstrumentHint(req.instrumentHint());
 
-  // List with pagination, sorting, filters
-  @GetMapping
-  public PageResponse<JamDtos.JamResponse> list(
-      @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "10") int size,
-      @RequestParam(defaultValue = "createdAt,desc") String sort,
-      @RequestParam(required = false) String genre,
-      @RequestParam(required = false) Integer minBpm,
-      @RequestParam(required = false) Integer maxBpm,
-      @RequestParam(required = false, name = "q") String query
-  ) {
-    // sort format: "field,dir" e.g. "bpm,asc"
-    String[] sortParts = sort.split(",");
-    String sortField = sortParts[0];
-    String sortDir = (sortParts.length > 1) ? sortParts[1].toLowerCase() : "desc";
+        if (req.visibility() != null && !req.visibility().isBlank()) {
+            jam.setVisibility(req.visibility().trim());
+        }
 
-    Sort.Direction direction = sortDir.equals("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-    Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-
-    Specification<Jam> spec = Specification.where(null);
-
-    if (genre != null && !genre.isBlank()) {
-      String g = genre.toLowerCase();
-      spec = spec.and((root, q1, cb) ->
-          cb.equal(cb.lower(root.get("genre")), g)
-      );
+        return JamResponse.from(jams.save(jam));
     }
 
-    if (minBpm != null) {
-      spec = spec.and((root, q1, cb) ->
-          cb.ge(root.get("bpm"), minBpm)
-      );
+    @GetMapping
+    public List<JamResponse> list() {
+        return jams.findAll().stream().map(JamResponse::from).toList();
     }
 
-    if (maxBpm != null) {
-      spec = spec.and((root, q1, cb) ->
-          cb.le(root.get("bpm"), maxBpm)
-      );
+    @GetMapping("/{id}")
+    public JamResponse get(@PathVariable UUID id) {
+        Jam jam = jams.findById(id).orElseThrow(() -> new IllegalArgumentException("Jam not found: " + id));
+        return JamResponse.from(jam);
     }
-
-    if (query != null && !query.isBlank()) {
-      String pattern = "%" + query.toLowerCase() + "%";
-      spec = spec.and((root, q1, cb) ->
-          cb.or(
-              cb.like(cb.lower(root.get("title")), pattern),
-              cb.like(cb.lower(root.get("genre")), pattern),
-              cb.like(cb.lower(root.get("instrumentHint")), pattern)
-          )
-      );
-    }
-
-    Page<Jam> pageResult = repo.findAll(spec, pageable);
-
-    List<JamDtos.JamResponse> content = pageResult
-        .getContent()
-        .stream()
-        .map(JamDtos::fromEntity)
-        .toList();
-
-    return new PageResponse<>(
-        content,
-        pageResult.getNumber(),
-        pageResult.getSize(),
-        pageResult.getTotalElements(),
-        pageResult.getTotalPages(),
-        pageResult.isLast()
-    );
-  }
-
-  // Get one jam
-  @GetMapping("/{id}")
-  public JamDtos.JamResponse getOne(@PathVariable UUID id) {
-    Jam j = repo.findById(id)
-        .orElseThrow(() -> new NotFoundException("Jam with id " + id + " not found"));
-    return JamDtos.fromEntity(j);
-  }
-
-  // Update jam (partial)
-  @PutMapping("/{id}")
-  public JamDtos.JamResponse update(
-      @PathVariable UUID id,
-      @Valid @RequestBody JamDtos.UpdateJamRequest req,
-      @AuthenticationPrincipal User currentUser
-  ) {
-    Jam j = repo.findById(id)
-        .orElseThrow(() -> new NotFoundException("Jam with id " + id + " not found"));
-
-    // Ownership check is optional; you can tighten this later
-    if (currentUser != null &&
-        j.getCreatedBy() != null &&
-        !j.getCreatedBy().getId().equals(currentUser.getId())) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your jam");
-    }
-
-    if (req.title() != null && !req.title().isBlank()) {
-      j.setTitle(req.title());
-    }
-    if (req.key() != null && !req.key().isBlank()) {
-      j.setMusicalKey(req.key());
-    }
-    if (req.bpm() != null) {
-      j.setBpm(req.bpm());
-    }
-    if (req.genre() != null) {
-      j.setGenre(req.genre());
-    }
-    if (req.instrumentHint() != null) {
-      j.setInstrumentHint(req.instrumentHint());
-    }
-    if (req.isPremium() != null) {
-      j.setPremium(req.isPremium());
-    }
-    if (req.layerCreditCost() != null) {
-      j.setLayerCreditCost(req.layerCreditCost());
-    }
-    if (req.isContest() != null) {
-      j.setContest(req.isContest());
-    }
-    if (req.isLocked() != null) {
-      j.setLocked(req.isLocked());
-    }
-    if (req.contestDescription() != null) {
-      j.setContestDescription(req.contestDescription());
-    }
-
-    j = repo.save(j);
-    return JamDtos.fromEntity(j);
-  }
-
-  // Delete jam
-  @DeleteMapping("/{id}")
-  public ResponseEntity<Void> deleteJam(
-      @PathVariable UUID id,
-      @AuthenticationPrincipal User currentUser
-  ) {
-    Jam jam = repo.findById(id)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
-
-    // Optional: enforce ownership
-    if (currentUser != null &&
-        jam.getCreatedBy() != null &&
-        !jam.getCreatedBy().getId().equals(currentUser.getId())) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your jam");
-    }
-
-    // Delete base audio file if it exists
-    String url = jam.getBaseAudioUrl();
-    if (url != null && url.startsWith("/audio/")) {
-      String fileName = url.substring("/audio/".length());
-      Path audioPath = Paths.get("uploads", "audio", fileName);
-      try {
-        Files.deleteIfExists(audioPath);
-      } catch (Exception e) {
-        System.err.println("Failed to delete audio file: " + audioPath + " -> " + e.getMessage());
-      }
-    }
-
-    repo.delete(jam);
-    return ResponseEntity.noContent().build();
-  }
-
-  // Upload base layer audio for a jam
-  @PostMapping("/{jamId}/layers/base")
-  public ResponseEntity<?> uploadBaseLayer(
-      @PathVariable UUID jamId,
-      @RequestParam("audio") MultipartFile audioFile,
-      @RequestParam(name = "loopBars", required = false) Integer loopBars
-  ) throws Exception {
-    Jam jam = repo.findById(jamId)
-        .orElseThrow(() -> new NotFoundException("Jam with id " + jamId + " not found"));
-
-    if (audioFile.isEmpty()) {
-      return ResponseEntity.badRequest().body("Audio file is required");
-    }
-
-    String audioUrl = audioStorageService.storeBaseLayerAudio(
-        audioFile,
-        jam.getId().toString()
-    );
-
-    jam.setBaseAudioUrl(audioUrl);
-    repo.save(jam);
-
-    System.out.println(
-        "Stored base layer for jam " + jam.getId() +
-        " at " + audioUrl +
-        " loopBars=" + loopBars
-    );
-
-    return ResponseEntity.status(HttpStatus.CREATED).build();
-  }
 }

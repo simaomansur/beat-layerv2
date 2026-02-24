@@ -1,156 +1,83 @@
-// src/api.ts
+export const BASE_URL = "http://localhost:8080";
 
-import { getToken } from "./auth/token";
-
-function authHeaders(): HeadersInit {
-  const token = getToken();
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  return headers;
-}
-
-export type Jam = {
+export type JamResponse = {
   id: string;
+  createdByUserId: string;
   title: string;
-  key: string | null;
-  bpm: number;
+  description: string | null;
+  loopLengthMs: number;
+  bpm: number | null;
+  musicalKey: string | null;
   genre: string | null;
   instrumentHint: string | null;
+  visibility: string | null;
+  rootItemId: string | null;
   createdAt: string;
-  loopBars?: number;
-  baseAudioUrl?: string | null; // 👈 new
+  updatedAt: string;
 };
 
-export const BASE_URL = "http://localhost:8080"; // Spring Boot backend
-
-export async function fetchJams(): Promise<Jam[]> {
-  const res = await fetch(`${BASE_URL}/jams?page=0&size=50`);
-  if (!res.ok) {
-    throw new Error("Failed to fetch jams");
-  }
-
-  const page = await res.json(); // PageResponse<Jam>
-  return page.content;           // 👈 just the array
-}
-
-export type CreateJamRequest = {
-  title: string;
-  key?: string | null;
-  bpm?: number | null;
-  genre?: string | null;
-  instrumentHint?: string | null;
-};
-
-export async function createJam(payload: CreateJamRequest): Promise<Jam> {
-  const res = await fetch(`${BASE_URL}/jams`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Failed to create jam: ${res.status}`);
-  }
-
-  return res.json();
-}
-
-export async function deleteJam(id: string) {
-  const res = await fetch(`${BASE_URL}/jams/${id}`, {
-    method: "DELETE",
-    headers: {
-      ...authHeaders(),
-    },
-  });
-
-  if (!res.ok && res.status !== 404) {
-    // 404 is "already gone" which we can ignore
-    throw new Error(`Failed to delete jam: ${res.status}`);
-  }
-}
-
-export type UserResponse = {
+export type ThreadItemResponse = {
   id: string;
-  handle: string;
-  email: string;
+  jamId: string;
+  parentItemId: string | null;
+  createdByUserId: string;
+  itemType: "AUDIO" | "COMMENT";
+  body: string | null;
   createdAt: string;
 };
 
-export async function fetchCurrentUser() {
-  const res = await fetch(`${BASE_URL}/users/me`);
+export type LineageAudioLayerResponse = {
+  threadItemId: string;
+  jamId: string;
+  parentItemId: string | null;
+  createdByUserId: string;
+  createdAt: string;
+
+  audioAssetId: string;
+  storageLocator: string;
+  mimeType: string;
+  durationMs: number;
+
+  startOffsetMs: number;
+  trimStartMs: number;
+  trimEndMs: number | null;
+  gainDb: number; // JSON number
+  pan: number;    // JSON number
+  muted: boolean;
+
+  instrument: string | null;
+  notes: string | null;
+};
+
+async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, init);
   if (!res.ok) {
-    throw new Error(`Failed to load current user: ${res.status}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${res.statusText} - ${text}`);
   }
-  return res.json(); // { id, handle, email, createdAt }
+  return res.json() as Promise<T>;
 }
 
-/**
- * Create a new jam and upload its base layer audio.
- * This is used by the Studio when you hit "Publish Jam".
- */
-export async function createJamWithBaseLayer(input: {
-  title: string;
-  key?: string | null;
-  bpm: number;
-  genre?: string | null;
-  instrumentHint?: string | null;
-  loopBars: number;
-  audioBlob: Blob;
-}): Promise<Jam> {
-  const {
-    title,
-    key,
-    bpm,
-    genre,
-    instrumentHint,
-    loopBars,
-    audioBlob,
-  } = input;
+export function listJams() {
+  return http<JamResponse[]>("/jams");
+}
 
-  // 1) Create the jam (metadata only)
-  const jamRes = await fetch(`${BASE_URL}/jams`, {
+export function getJam(jamId: string) {
+  return http<JamResponse>(`/jams/${jamId}`);
+}
+
+export function getJamThread(jamId: string) {
+  return http<ThreadItemResponse[]>(`/thread/jams/${jamId}`);
+}
+
+export function getLineage(threadItemId: string) {
+  return http<LineageAudioLayerResponse[]>(`/thread/${threadItemId}/lineage`);
+}
+
+export function createComment(parentId: string, createdByUserId: string, body: string) {
+  return http<ThreadItemResponse>(`/thread/${parentId}/comment`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: JSON.stringify({
-      title,
-      key: key ?? null,
-      bpm,
-      genre: genre ?? null,
-      instrumentHint: instrumentHint ?? null,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ createdByUserId, body }),
   });
-
-  if (!jamRes.ok) {
-    throw new Error(`Failed to create jam: ${jamRes.status}`);
-  }
-
-  const jam: Jam = await jamRes.json();
-
-  // 2) Upload the base layer audio as multipart/form-data
-  const formData = new FormData();
-  formData.append("audio", audioBlob, "base-layer.webm");
-  formData.append("isBase", "true");
-  formData.append("loopBars", String(loopBars));
-
-  const layerRes = await fetch(`${BASE_URL}/jams/${jam.id}/layers/base`, {
-    method: "POST",
-    headers: {
-      ...authHeaders(),
-    },
-    body: formData,
-  });
-
-  if (!layerRes.ok) {
-    throw new Error(`Failed to upload base layer: ${layerRes.status}`);
-  }
-
-  return jam;
 }
