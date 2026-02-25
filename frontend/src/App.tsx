@@ -1,19 +1,15 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import JamListPage from "./pages/JamListPage";
-import JamDetailPage from "./pages/JamDetailPage";
-import "./App.css";
+import LandingPage from "./pages/LandingPage";
+import WorkspacePage from "./pages/WorkspacePage";
 
-const App: React.FC = () => {
+export default function App() {
   return (
-    <div className="app">
-      <Routes>
-        <Route path="/" element={<JamListPage />} />
-        <Route path="/jams/:jamId" element={<JamDetailPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </div>
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/app" element={<WorkspacePage />} />
+      <Route path="/app/jams/:jamId" element={<WorkspacePage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
-};
-
-export default App;
+}
